@@ -2,22 +2,32 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
-const frontendPath = path.join(__dirname, 'frontend');
-const distPath = path.join(__dirname, 'dist');
+const frontendPath = path.resolve(__dirname, 'frontend');
+const distPath = path.resolve(frontendPath, 'dist');
 
 // 1. Create dist directory if it doesn't exist
 if (!fs.existsSync(distPath)) {
-    fs.mkdirSync(distPath);
+    fs.mkdirSync(distPath, { recursive: true });
 }
 
 // 2. Helper to copy and replace files
-function processFile(filename) {
-    const src = path.join(frontendPath, filename);
-    const dest = path.join(distPath, filename);
+function processFile(relativePath) {
+    const src = path.resolve(frontendPath, relativePath);
+    const dest = path.resolve(distPath, relativePath);
 
-    if (fs.statSync(src).isDirectory()) {
-        if (!fs.existsSync(dest)) fs.mkdirSync(dest);
-        fs.readdirSync(src).forEach(file => processFile(path.join(filename, file)));
+    // CRITICAL: Stop if we are trying to process the dist directory itself
+    // Path.resolve handles different separators and trailing slashes
+    if (src === distPath || src.startsWith(distPath + path.sep)) {
+        return;
+    }
+
+    const stats = fs.statSync(src);
+
+    if (stats.isDirectory()) {
+        if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+        fs.readdirSync(src).forEach(file => {
+            processFile(path.join(relativePath, file));
+        });
         return;
     }
 
@@ -33,15 +43,18 @@ function processFile(filename) {
     content = content.replace(/__API_BASE_URL__/g, apiBaseUrl);
 
     fs.writeFileSync(dest, content);
-    console.log(`Processed ${filename}`);
+    console.log(`Processed ${relativePath}`);
 }
 
-// 3. Process all files in frontend
-fs.readdirSync(frontendPath).forEach(file => processFile(file));
+// 3. Process all files in frontend (excluding dist)
+fs.readdirSync(frontendPath).forEach(file => {
+    if (file === 'dist') return;
+    processFile(file);
+});
 
 // 4. Process wrangler.toml
-const wranglerSrc = path.join(__dirname, 'worker', 'wrangler.toml.template');
-const wranglerDest = path.join(__dirname, 'worker', 'wrangler.toml');
+const wranglerSrc = path.resolve(__dirname, 'worker', 'wrangler.toml.template');
+const wranglerDest = path.resolve(__dirname, 'worker', 'wrangler.toml');
 
 if (fs.existsSync(wranglerSrc)) {
     let content = fs.readFileSync(wranglerSrc, 'utf8');
@@ -55,4 +68,4 @@ if (fs.existsSync(wranglerSrc)) {
     console.log('Processed wrangler.toml.template -> wrangler.toml');
 }
 
-console.log('Build complete: Files are in /dist and worker/wrangler.toml updated');
+console.log(`Build complete: Files are in ${distPath}`);
