@@ -73,6 +73,11 @@ body.dark-mode .btn-icon {
     color: #f1f5f9;
 }
 
+body.dark-mode .editor-preview {
+    background: #1e293b;
+    color: #f1f5f9;
+}
+
 * {
     box-sizing: border-box;
     margin: 0;
@@ -108,6 +113,17 @@ body {
     align-items: center;
     padding: 0 2rem;
     gap: 2rem;
+}
+
+.mobile-toggle {
+    display: none;
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--text-main);
+    cursor: pointer;
+    margin-right: 0.75rem;
+    padding: 0.25rem;
 }
 
 .logo {
@@ -375,9 +391,17 @@ body {
 }
 
 .nav-item.dragging,
-.nav-divider-container.dragging {
+.nav-divider-container.dragging,
+.nav-category.dragging {
     opacity: 0.5;
     background: #e2e8f0;
+}
+
+.nav-item-container.drag-over,
+.nav-category.drag-over {
+    background: rgba(79, 70, 229, 0.05) !important;
+    outline: 2px dashed var(--primary);
+    border-radius: 6px;
 }
 
 .sidebar-actions {
@@ -443,8 +467,19 @@ body {
     font-size: 0.95rem;
     line-height: 1.5;
     margin-bottom: 1rem;
-    background: #fff;
+    background: var(--bg-main);
+    color: var(--text-main);
     resize: vertical;
+}
+
+.editor-preview {
+    padding: 1.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-main);
+    margin-bottom: 1rem;
+    min-height: 400px;
+    overflow-y: auto;
 }
 
 .editor-actions {
@@ -467,7 +502,7 @@ body {
 
 .doc-content p {
     margin-bottom: 1.25rem;
-    color: #475569;
+    color: var(--text-main);
 }
 
 .doc-content img {
@@ -477,6 +512,8 @@ body {
     margin: 1.5rem 0;
     box-shadow: var(--shadow-md);
     display: block;
+    background-color: #ffffff;
+    padding: 0.5rem;
 }
 
 .doc-content ul,
@@ -487,7 +524,7 @@ body {
 
 .doc-content li {
     margin-bottom: 0.5rem;
-    color: #475569;
+    color: var(--text-main);
 }
 
 /* TOC (Right sidebar) */
@@ -641,12 +678,29 @@ body {
 }
 
 @media (max-width: 768px) {
+    .mobile-toggle {
+        display: block;
+    }
+
     .sidebar {
-        display: none;
+        position: fixed;
+        left: -100%;
+        top: var(--header-height);
+        bottom: 0;
+        z-index: 1000;
+        background: var(--bg-sidebar);
+        transition: left 0.3s ease;
+        display: block;
+        /* Overwrite display:none */
+        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .sidebar.active {
+        left: 0;
     }
 
     .content-area {
-        padding: 2rem;
+        padding: 1.5rem;
     }
 
     .header-container {
@@ -655,5 +709,21 @@ body {
 
     .search-container {
         display: none;
+    }
+
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        top: var(--header-height);
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.3);
+        z-index: 999;
+        backdrop-filter: blur(2px);
+    }
+
+    .sidebar-overlay.active {
+        display: block;
     }
 }

@@ -140,6 +140,7 @@ const sugarAppLink = document.getElementById('sugar-app-link');
 const editShortcutBtn = document.getElementById('edit-shortcut-btn');
 const addDividerBtn = document.getElementById('add-divider-btn');
 const themeToggleBtn = document.getElementById('theme-toggle');
+const deployBtn = document.getElementById('deploy-btn');
 const API_BASE_URL = 'https://site-blogs.iamjeesun.workers.dev';
 
 // App State
@@ -159,6 +160,9 @@ const navTree = document.getElementById('nav-tree');
 const docContent = document.getElementById('doc-content');
 const breadcrumbCurrent = document.getElementById('current-breadcrumb');
 const tocList = document.getElementById('toc-list');
+const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+const sidebar = document.querySelector('.sidebar');
+const sidebarOverlay = document.getElementById('sidebar-overlay');
 
 // Initialize
 async function init() {
@@ -250,34 +254,55 @@ async function init() {
 }
 
 async function persistAll() {
-    // Save to LocalStorage for offline fallback
+    // Save to LocalStorage for session persistence (current browser only)
     localStorage.setItem('sugar_roles_data', JSON.stringify(rolesData));
     localStorage.setItem('sugar_current_role', currentState.currentRole);
     localStorage.setItem('sugar_media', JSON.stringify(mediaAssets));
     localStorage.setItem('sugar_app_url', currentState.sugarAppUrl);
     localStorage.setItem('sugar_theme', currentState.theme);
 
-    // Save to Server KV
-    if (currentState.isLoggedIn) {
-        try {
-            const dataToSave = {
-                rolesData,
-                mediaAssets,
-                sugarAppUrl: currentState.sugarAppUrl
-            };
+    // Change button style to indicate unsaved changes
+    if (currentState.isLoggedIn && deployBtn) {
+        deployBtn.style.background = '#f59e0b'; // Amber color for "pending"
+        deployBtn.textContent = '🚀 배포하기*';
+    }
+}
 
-            const response = await fetch(`${API_BASE_URL}/api/data`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(dataToSave)
-            });
+async function publishSiteData() {
+    if (!currentState.isLoggedIn) return;
 
-            if (response.ok) {
-                console.log('Site data synced to server');
-            }
-        } catch (err) {
-            console.error('Server sync failed:', err);
+    deployBtn.disabled = true;
+    deployBtn.textContent = '⏳ 배포 중...';
+
+    try {
+        const dataToSave = {
+            rolesData,
+            mediaAssets,
+            sugarAppUrl: currentState.sugarAppUrl
+        };
+
+        const response = await fetch(`${API_BASE_URL}/api/data`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dataToSave)
+        });
+
+        if (response.ok) {
+            alert('성공적으로 배포되었습니다! 이제 모든 사용자가 변경 사항을 볼 수 있습니다.');
+            deployBtn.style.background = 'var(--primary)';
+            deployBtn.textContent = '🚀 배포 완료';
+            setTimeout(() => {
+                deployBtn.textContent = '🚀 배포하기';
+            }, 3000);
+        } else {
+            throw new Error('Server response not ok');
         }
+    } catch (err) {
+        console.error('Server sync failed:', err);
+        alert('배포 중 오류가 발생했습니다: ' + err.message);
+        deployBtn.textContent = '🚀 배포 실패 (재시도)';
+    } finally {
+        deployBtn.disabled = false;
     }
 }
 
@@ -328,8 +353,21 @@ function renderMenu() {
         `;
 
         if (currentState.isLoggedIn) {
-            h4.querySelector('.cat-rename').addEventListener('click', () => renameCategory(catIndex));
-            h4.querySelector('.cat-delete').addEventListener('click', () => deleteCategory(catIndex));
+            catContainer.draggable = true;
+            catContainer.addEventListener('dragstart', handleCatDragStart);
+            catContainer.addEventListener('dragover', handleCatDragOver);
+            catContainer.addEventListener('drop', handleCatDrop);
+            catContainer.addEventListener('dragend', handleCatDragEnd);
+            catContainer.addEventListener('dragleave', () => catContainer.classList.remove('drag-over'));
+
+            h4.querySelector('.cat-rename').addEventListener('click', (e) => {
+                e.stopPropagation();
+                renameCategory(catIndex);
+            });
+            h4.querySelector('.cat-delete').addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteCategory(catIndex);
+            });
         }
 
         catContainer.appendChild(h4);
@@ -360,6 +398,7 @@ function renderMenu() {
                     divider.addEventListener('dragstart', handleDragStart);
                     divider.addEventListener('dragend', handleDragEnd);
                     li.addEventListener('dragover', handleDragOver);
+                    li.addEventListener('dragleave', () => li.classList.remove('drag-over'));
                     li.addEventListener('drop', handleDrop);
 
                     divider.querySelector('.delete-item-btn').addEventListener('click', (e) => {
@@ -401,6 +440,7 @@ function renderMenu() {
 
                     // Drop handlers for the container
                     li.addEventListener('dragover', handleDragOver);
+                    li.addEventListener('dragleave', () => li.classList.remove('drag-over'));
                     li.addEventListener('drop', handleDrop);
 
                     // Edit/Delete handlers
@@ -424,9 +464,12 @@ function renderMenu() {
 
 // Drag and Drop Handlers
 let draggedItem = null;
+let draggedType = null; // 'item' or 'category'
 
 function handleDragStart(e) {
+    e.stopPropagation();
     draggedItem = this;
+    draggedType = 'item';
     this.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
 }
@@ -434,20 +477,68 @@ function handleDragStart(e) {
 function handleDragEnd() {
     this.classList.remove('dragging');
     draggedItem = null;
+    draggedType = null;
     document.querySelectorAll('.nav-item-container').forEach(el => el.classList.remove('drag-over'));
+    document.querySelectorAll('.nav-category').forEach(el => el.classList.remove('drag-over'));
+}
+
+// Category Drag and Drop
+function handleCatDragStart(e) {
+    draggedItem = this;
+    draggedType = 'category';
+    this.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleCatDragOver(e) {
+    e.preventDefault();
+    if (draggedType !== 'category') return;
+    e.dataTransfer.dropEffect = 'move';
+    this.classList.add('drag-over');
+}
+
+function handleCatDragEnd() {
+    handleDragEnd.call(this);
+}
+
+function handleCatDrop(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (draggedType !== 'category') return;
+
+    const sourceIndex = parseInt(draggedItem.dataset.index);
+    const targetIndex = parseInt(this.dataset.index);
+
+    if (sourceIndex === targetIndex) return;
+
+    const catToMove = menuStructure.splice(sourceIndex, 1)[0];
+    menuStructure.splice(targetIndex, 0, catToMove);
+
+    persistAll();
+    renderMenu();
 }
 
 function handleDragOver(e) {
     e.preventDefault();
+    if (draggedType !== 'item') return;
     e.dataTransfer.dropEffect = 'move';
+    this.classList.add('drag-over');
 }
 
 function handleDrop(e) {
     e.preventDefault();
+    e.stopPropagation();
+    if (draggedType !== 'item') return;
+
     const sourceCatIndex = parseInt(draggedItem.dataset.catIndex);
     const sourceItemIndex = parseInt(draggedItem.dataset.itemIndex);
-    const targetCatIndex = parseInt(this.querySelector('.nav-item').dataset.catIndex);
-    const targetItemIndex = parseInt(this.querySelector('.nav-item').dataset.itemIndex);
+
+    // Target is the li container
+    const targetItem = this.querySelector('.nav-item') || this.querySelector('.nav-divider-container');
+    if (!targetItem) return;
+
+    const targetCatIndex = parseInt(targetItem.dataset.catIndex);
+    const targetItemIndex = parseInt(targetItem.dataset.itemIndex);
 
     if (sourceCatIndex === targetCatIndex && sourceItemIndex === targetItemIndex) return;
 
@@ -573,27 +664,61 @@ function formatBytes(bytes) {
     else return (bytes / 1048576).toFixed(1) + ' MB';
 }
 
+function getImageDimensions(url) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve({ width: img.width, height: img.height });
+        img.onerror = () => resolve({ width: 0, height: 0 });
+        img.src = url;
+    });
+}
+
 function renderMediaLibrary() {
     mediaGrid.innerHTML = '';
+
+    // Normalize mediaAssets to objects
     mediaAssets.forEach((asset, index) => {
-        const url = typeof asset === 'string' ? asset : asset.url;
-        const size = typeof asset === 'string' ? 0 : (asset.size || 0);
+        if (typeof asset === 'string') {
+            mediaAssets[index] = { url: asset, size: 0 };
+        }
+    });
+
+    mediaAssets.forEach((asset, index) => {
+        const url = asset.url;
+        const size = asset.size || 0;
 
         const item = document.createElement('div');
-        item.style.cssText = 'border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #fff; position: relative; display: flex; flex-direction: column;';
+        item.style.cssText = 'border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: var(--bg-main); position: relative; display: flex; flex-direction: column;';
+
+        const resolutionText = asset.width ? ` • ${asset.width}x${asset.height}` : '';
 
         item.innerHTML = `
             <div style="height: 100px; background: url('${url}') center/cover no-repeat;"></div>
             <div style="padding: 0.6rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
-                <div style="font-size: 0.65rem; color: var(--text-muted); margin-bottom: 6px; text-align: center; font-weight: 500;">
-                    ${formatBytes(size)}
+                <div class="media-info-text" style="font-size: 0.65rem; color: var(--text-muted); margin-bottom: 6px; text-align: center; font-weight: 500;">
+                    ${formatBytes(size)}${resolutionText}
                 </div>
                 <div style="display: flex; gap: 4px;">
-                    <button class="btn btn-ghost copy-media-url" style="flex: 1; font-size: 0.65rem; padding: 4px; border: 1px solid #e2e8f0;">주소 복사</button>
-                    <button class="btn btn-ghost delete-media" style="flex: 1; font-size: 0.65rem; padding: 4px; color: #ef4444; border: 1px solid #fee2e2;">삭제</button>
+                    <button class="btn btn-ghost copy-media-url" style="flex: 1; font-size: 0.65rem; padding: 4px; border: 1px solid var(--border-color); color: var(--text-main);">주소 복사</button>
+                    <button class="btn btn-ghost delete-media" style="flex: 1; font-size: 0.65rem; padding: 4px; color: #ef4444; border: 1px solid var(--border-color);">삭제</button>
                 </div>
             </div>
         `;
+
+        // Async fetch dimensions if missing
+        if (!asset.width && url) {
+            getImageDimensions(url).then(dims => {
+                if (dims.width > 0) {
+                    asset.width = dims.width;
+                    asset.height = dims.height;
+                    const infoEl = item.querySelector('.media-info-text');
+                    if (infoEl) {
+                        infoEl.innerHTML = `${formatBytes(size)} • ${dims.width}x${dims.height}`;
+                    }
+                    persistAll();
+                }
+            });
+        }
 
         item.querySelector('.copy-media-url').addEventListener('click', () => {
             navigator.clipboard.writeText(url).then(() => alert('이미지 주소가 복사되었습니다.'));
@@ -611,11 +736,17 @@ function renderMediaLibrary() {
     });
 }
 
-function addMedia() {
+async function addMedia() {
     const url = newMediaUrlInput.value.trim();
     if (!url) return;
 
-    mediaAssets.unshift({ url, size: 0 });
+    const dims = await getImageDimensions(url);
+    mediaAssets.unshift({
+        url,
+        size: 0,
+        width: dims.width || 0,
+        height: dims.height || 0
+    });
     newMediaUrlInput.value = '';
     persistAll();
     renderMediaLibrary();
@@ -652,10 +783,14 @@ async function handleFileUpload(e) {
 
         const result = await response.json();
 
+        const dims = await getImageDimensions(URL.createObjectURL(file));
+
         mediaAssets.unshift({
             url: result.url,
             size: result.size,
-            name: file.name
+            name: file.name,
+            width: dims.width,
+            height: dims.height
         });
 
         persistAll();
@@ -707,6 +842,16 @@ function loadPage(pageId) {
     }
 
     window.scrollTo(0, 0);
+
+    // Close mobile menu if active
+    if (sidebar.classList.contains('active')) {
+        toggleMobileMenu();
+    }
+}
+
+function toggleMobileMenu() {
+    sidebar.classList.toggle('active');
+    sidebarOverlay.classList.toggle('active');
 }
 
 function toggleTheme() {
@@ -761,10 +906,12 @@ function updateEditControlsVisibility() {
         editControls.classList.add('active');
         sidebarControls.style.display = 'block';
         sidebarActions.style.display = 'flex';
+        if (deployBtn) deployBtn.style.display = 'inline-block';
     } else {
         editControls.classList.remove('active');
         sidebarControls.style.display = 'none';
         sidebarActions.style.display = 'none';
+        if (deployBtn) deployBtn.style.display = 'none';
     }
     updateShortcutUI();
 }
@@ -858,6 +1005,11 @@ function setupEventListeners() {
     addCatBtn.addEventListener('click', addCategory);
     addDividerBtn.addEventListener('click', addDivider);
     themeToggleBtn.addEventListener('click', toggleTheme);
+    deployBtn.addEventListener('click', publishSiteData);
+
+    // Mobile menu
+    mobileMenuToggle.addEventListener('click', toggleMobileMenu);
+    sidebarOverlay.addEventListener('click', toggleMobileMenu);
 
     // Media management
     mediaLibraryBtn.addEventListener('click', () => {
