@@ -136,6 +136,8 @@ const closeMenuModalBtn = document.getElementById('close-menu-modal');
 const saveMenuBtn = document.getElementById('save-menu');
 const appContainer = document.getElementById('app');
 const roleSelect = document.getElementById('role-select');
+const sugarAppLink = document.getElementById('sugar-app-link');
+const editShortcutBtn = document.getElementById('edit-shortcut-btn');
 
 // App State
 let currentState = {
@@ -143,7 +145,8 @@ let currentState = {
     currentUser: null,
     activePage: 'landlord-intro',
     currentRole: 'landlord',
-    isEditing: false
+    isEditing: false,
+    sugarAppUrl: 'https://sugar-app.dev' // Default URL
 };
 
 // DOM Elements
@@ -172,6 +175,12 @@ async function init() {
             'https://images.unsplash.com/photo-1554469384-e58fb162020a?w=400'
         ];
     }
+
+    const savedShortcutUrl = localStorage.getItem('sugar_app_url');
+    if (savedShortcutUrl) {
+        currentState.sugarAppUrl = savedShortcutUrl;
+    }
+    updateShortcutUI();
 
     if (savedRole && rolesData[savedRole]) {
         currentState.currentRole = savedRole;
@@ -224,6 +233,7 @@ function persistAll() {
     localStorage.setItem('sugar_roles_data', JSON.stringify(rolesData));
     localStorage.setItem('sugar_current_role', currentState.currentRole);
     localStorage.setItem('sugar_media', JSON.stringify(mediaAssets));
+    localStorage.setItem('sugar_app_url', currentState.sugarAppUrl);
 }
 
 function switchRole(role) {
@@ -585,6 +595,25 @@ function loadPage(pageId) {
     window.scrollTo(0, 0);
 }
 
+function updateShortcutUI() {
+    sugarAppLink.href = currentState.sugarAppUrl;
+    if (currentState.isLoggedIn) {
+        editShortcutBtn.style.display = 'inline-block';
+    } else {
+        editShortcutBtn.style.display = 'none';
+    }
+}
+
+function editShortcut(e) {
+    if (e) e.preventDefault();
+    const newUrl = prompt('Sugar app 바로 가기 URL을 입력하세요:', currentState.sugarAppUrl);
+    if (newUrl !== null && newUrl.trim() !== '') {
+        currentState.sugarAppUrl = newUrl.trim();
+        persistAll();
+        updateShortcutUI();
+    }
+}
+
 function renderTOC(tocItems) {
     tocList.innerHTML = '';
     tocItems.forEach(item => {
@@ -607,6 +636,7 @@ function updateEditControlsVisibility() {
         sidebarControls.style.display = 'none';
         sidebarActions.style.display = 'none';
     }
+    updateShortcutUI();
 }
 
 function openMenuEditor() {
@@ -715,6 +745,8 @@ function setupEventListeners() {
     roleSelect.addEventListener('change', (e) => {
         switchRole(e.target.value);
     });
+
+    editShortcutBtn.addEventListener('click', editShortcut);
 }
 
 function updateAuthUI() {
