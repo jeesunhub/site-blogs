@@ -138,6 +138,8 @@ const appContainer = document.getElementById('app');
 const roleSelect = document.getElementById('role-select');
 const sugarAppLink = document.getElementById('sugar-app-link');
 const editShortcutBtn = document.getElementById('edit-shortcut-btn');
+const addDividerBtn = document.getElementById('add-divider-btn');
+const themeToggleBtn = document.getElementById('theme-toggle');
 
 // App State
 let currentState = {
@@ -146,7 +148,8 @@ let currentState = {
     activePage: 'landlord-intro',
     currentRole: 'landlord',
     isEditing: false,
-    sugarAppUrl: 'https://sugar-app.dev' // Default URL
+    sugarAppUrl: 'https://sugar-app.dev', // Default URL
+    theme: 'light'
 };
 
 // DOM Elements
@@ -162,6 +165,12 @@ async function init() {
     const savedRolesData = localStorage.getItem('sugar_roles_data');
     const savedRole = localStorage.getItem('sugar_current_role');
     const savedMedia = localStorage.getItem('sugar_media');
+    const savedTheme = localStorage.getItem('sugar_theme');
+
+    if (savedTheme) {
+        currentState.theme = savedTheme;
+        applyTheme();
+    }
 
     if (savedRolesData) {
         rolesData = JSON.parse(savedRolesData);
@@ -234,6 +243,7 @@ function persistAll() {
     localStorage.setItem('sugar_current_role', currentState.currentRole);
     localStorage.setItem('sugar_media', JSON.stringify(mediaAssets));
     localStorage.setItem('sugar_app_url', currentState.sugarAppUrl);
+    localStorage.setItem('sugar_theme', currentState.theme);
 }
 
 function switchRole(role) {
@@ -296,52 +306,80 @@ function renderMenu() {
             const li = document.createElement('li');
             li.className = 'nav-item-container';
 
-            const a = document.createElement('a');
-            a.className = `nav-item ${currentState.activePage === item.id ? 'active' : ''}`;
-            a.href = `#${item.id}`;
-            a.draggable = currentState.isLoggedIn;
+            if (item.type === 'divider') {
+                const divider = document.createElement('div');
+                divider.className = 'nav-divider-container';
+                divider.draggable = currentState.isLoggedIn;
+                divider.dataset.id = item.id;
+                divider.dataset.catIndex = catIndex;
+                divider.dataset.itemIndex = itemIndex;
 
-            // Drag and Drop Attributes
-            a.dataset.id = item.id;
-            a.dataset.catIndex = catIndex;
-            a.dataset.itemIndex = itemIndex;
+                divider.innerHTML = `
+                    <div class="nav-divider"></div>
+                    <div class="nav-divider-actions">
+                        <span class="delete-item-btn" title="삭제">✕</span>
+                    </div>
+                `;
 
-            a.innerHTML = `
-                <span class="nav-item-text">${item.title}</span>
-                <span class="nav-item-actions">
-                    <span class="edit-title-btn" title="제목 수정">✏️</span>
-                    <span class="delete-item-btn" title="삭제">✕</span>
-                </span>
-            `;
+                if (currentState.isLoggedIn) {
+                    divider.addEventListener('dragstart', handleDragStart);
+                    divider.addEventListener('dragend', handleDragEnd);
+                    li.addEventListener('dragover', handleDragOver);
+                    li.addEventListener('drop', handleDrop);
 
-            // Event Listeners
-            a.addEventListener('click', (e) => {
-                if (e.target.classList.contains('delete-item-btn') || e.target.classList.contains('edit-title-btn')) return;
-                e.preventDefault();
-                loadPage(item.id);
-            });
+                    divider.querySelector('.delete-item-btn').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        deletePage(catIndex, itemIndex);
+                    });
+                }
+                li.appendChild(divider);
+            } else {
+                const a = document.createElement('a');
+                a.className = `nav-item ${currentState.activePage === item.id ? 'active' : ''}`;
+                a.href = `#${item.id}`;
+                a.draggable = currentState.isLoggedIn;
 
-            if (currentState.isLoggedIn) {
-                // Drag start
-                a.addEventListener('dragstart', handleDragStart);
-                a.addEventListener('dragend', handleDragEnd);
+                // Drag and Drop Attributes
+                a.dataset.id = item.id;
+                a.dataset.catIndex = catIndex;
+                a.dataset.itemIndex = itemIndex;
 
-                // Drop handlers for the container
-                li.addEventListener('dragover', handleDragOver);
-                li.addEventListener('drop', handleDrop);
+                a.innerHTML = `
+                    <span class="nav-item-text">${item.title}</span>
+                    <span class="nav-item-actions">
+                        <span class="edit-title-btn" title="제목 수정">✏️</span>
+                        <span class="delete-item-btn" title="삭제">✕</span>
+                    </span>
+                `;
 
-                // Edit/Delete handlers
-                a.querySelector('.edit-title-btn').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    renamePage(catIndex, itemIndex);
+                // Event Listeners
+                a.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('delete-item-btn') || e.target.classList.contains('edit-title-btn')) return;
+                    e.preventDefault();
+                    loadPage(item.id);
                 });
-                a.querySelector('.delete-item-btn').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    deletePage(catIndex, itemIndex);
-                });
+
+                if (currentState.isLoggedIn) {
+                    // Drag start
+                    a.addEventListener('dragstart', handleDragStart);
+                    a.addEventListener('dragend', handleDragEnd);
+
+                    // Drop handlers for the container
+                    li.addEventListener('dragover', handleDragOver);
+                    li.addEventListener('drop', handleDrop);
+
+                    // Edit/Delete handlers
+                    a.querySelector('.edit-title-btn').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        renamePage(catIndex, itemIndex);
+                    });
+                    a.querySelector('.delete-item-btn').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        deletePage(catIndex, itemIndex);
+                    });
+                }
+                li.appendChild(a);
             }
-
-            li.appendChild(a);
             ul.appendChild(li);
         });
         catContainer.appendChild(ul);
@@ -454,6 +492,18 @@ function addCategory() {
     renderMenu();
 }
 
+function addDivider() {
+    // Add a divider to the first category by default
+    const dividerId = 'divider-' + Date.now();
+    menuStructure[0].items.push({
+        id: dividerId,
+        title: '---',
+        type: 'divider'
+    });
+    persistAll();
+    renderMenu();
+}
+
 function renameCategory(catIndex) {
     const cat = menuStructure[catIndex];
     const newTitle = prompt('카테고리 이름을 수정하세요:', cat.category);
@@ -481,17 +531,32 @@ function deleteCategory(catIndex) {
 }
 
 // Media Library Functions
+function formatBytes(bytes) {
+    if (!bytes || bytes === 0) return '외부 링크';
+    if (bytes < 1024) return bytes + ' B';
+    else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    else return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
 function renderMediaLibrary() {
     mediaGrid.innerHTML = '';
-    mediaAssets.forEach((url, index) => {
+    mediaAssets.forEach((asset, index) => {
+        const url = typeof asset === 'string' ? asset : asset.url;
+        const size = typeof asset === 'string' ? 0 : (asset.size || 0);
+
         const item = document.createElement('div');
-        item.style.cssText = 'border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #fff; position: relative;';
+        item.style.cssText = 'border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #fff; position: relative; display: flex; flex-direction: column;';
 
         item.innerHTML = `
             <div style="height: 100px; background: url('${url}') center/cover no-repeat;"></div>
-            <div style="padding: 0.5rem;">
-                <button class="btn btn-ghost copy-media-url" style="width: 100%; font-size: 0.7rem; padding: 4px;">주소 복사</button>
-                <button class="btn btn-ghost delete-media" style="width: 100%; font-size: 0.7rem; padding: 4px; color: #ef4444;">삭제</button>
+            <div style="padding: 0.6rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                <div style="font-size: 0.65rem; color: var(--text-muted); margin-bottom: 6px; text-align: center; font-weight: 500;">
+                    ${formatBytes(size)}
+                </div>
+                <div style="display: flex; gap: 4px;">
+                    <button class="btn btn-ghost copy-media-url" style="flex: 1; font-size: 0.65rem; padding: 4px; border: 1px solid #e2e8f0;">주소 복사</button>
+                    <button class="btn btn-ghost delete-media" style="flex: 1; font-size: 0.65rem; padding: 4px; color: #ef4444; border: 1px solid #fee2e2;">삭제</button>
+                </div>
             </div>
         `;
 
@@ -515,13 +580,13 @@ function addMedia() {
     const url = newMediaUrlInput.value.trim();
     if (!url) return;
 
-    mediaAssets.unshift(url);
+    mediaAssets.unshift({ url, size: 0 });
     newMediaUrlInput.value = '';
     persistAll();
     renderMediaLibrary();
 }
 
-function handleFileUpload(e) {
+async function handleFileUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
 
@@ -531,28 +596,43 @@ function handleFileUpload(e) {
         return;
     }
 
-    // Check file size (limit to 2MB for localStorage safety)
-    if (file.size > 2 * 1024 * 1024) {
-        alert('파일 크기가 너무 큽니다 (최대 2MB).');
+    // Check file size (limit to 5MB for KV safety)
+    if (file.size > 5 * 1024 * 1024) {
+        alert('파일 크기가 너무 큽니다 (최대 5MB).');
         return;
     }
 
     uploadStatus.textContent = '업로드 중...';
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-        const base64String = event.target.result;
-        mediaAssets.unshift(base64String);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const apiBaseUrl = '__API_BASE_URL__';
+    try {
+        const response = await fetch(`${apiBaseUrl}/api/upload`, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) throw new Error('업로드 실패');
+
+        const result = await response.json();
+
+        mediaAssets.unshift({
+            url: result.url,
+            size: result.size,
+            name: file.name
+        });
+
         persistAll();
         renderMediaLibrary();
         uploadStatus.textContent = '완료!';
-        setTimeout(() => uploadStatus.textContent = '', 2000);
-    };
-    reader.onerror = () => {
-        alert('파일을 읽는 중 오류가 발생했습니다.');
-        uploadStatus.textContent = '';
-    };
-    reader.readAsDataURL(file);
+        setTimeout(() => uploadStatus.textContent = '', 3000);
+    } catch (err) {
+        console.error(err);
+        uploadStatus.textContent = '실패: ' + err.message;
+        alert('업로드 중 오류가 발생했습니다: ' + err.message);
+    }
 }
 
 
@@ -593,6 +673,22 @@ function loadPage(pageId) {
     }
 
     window.scrollTo(0, 0);
+}
+
+function toggleTheme() {
+    currentState.theme = currentState.theme === 'light' ? 'dark' : 'light';
+    applyTheme();
+    persistAll();
+}
+
+function applyTheme() {
+    if (currentState.theme === 'dark') {
+        document.body.classList.add('dark-mode');
+        themeToggleBtn.textContent = '☀️';
+    } else {
+        document.body.classList.remove('dark-mode');
+        themeToggleBtn.textContent = '🌙';
+    }
 }
 
 function updateShortcutUI() {
@@ -726,6 +822,8 @@ function setupEventListeners() {
     saveMenuBtn.addEventListener('click', saveMenuStructure);
     addPageBtn.addEventListener('click', addPage);
     addCatBtn.addEventListener('click', addCategory);
+    addDividerBtn.addEventListener('click', addDivider);
+    themeToggleBtn.addEventListener('click', toggleTheme);
 
     // Media management
     mediaLibraryBtn.addEventListener('click', () => {

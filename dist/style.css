@@ -15,6 +15,53 @@
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
 }
 
+body.dark-mode {
+    --bg-main: #0f172a;
+    --bg-sidebar: #1e293b;
+    --border-color: #334155;
+    --text-main: #f1f5f9;
+    --text-muted: #94a3b8;
+    --primary: #818cf8;
+    --primary-hover: #6366f1;
+}
+
+body.dark-mode .header {
+    background: rgba(15, 23, 42, 0.8);
+}
+
+body.dark-mode .search-container input {
+    background: #1e293b;
+    color: #f1f5f9;
+}
+
+body.dark-mode #content-editor {
+    background: #1e293b;
+    color: #f1f5f9;
+}
+
+body.dark-mode .modal-content {
+    background: #1e293b;
+    color: #f1f5f9;
+}
+
+body.dark-mode .role-selector select {
+    background: #1e293b !important;
+    color: #f1f5f9;
+    border-color: var(--border-color);
+}
+
+body.dark-mode .nav-item.active {
+    background: rgba(129, 140, 248, 0.1);
+}
+
+body.dark-mode .doc-content p {
+    color: #cbd5e1;
+}
+
+body.dark-mode .doc-content li {
+    color: #cbd5e1;
+}
+
 * {
     box-sizing: border-box;
     margin: 0;
@@ -275,6 +322,51 @@ body {
 .edit-title-btn:hover {
     background: #f1f5f9;
     color: var(--primary);
+}
+
+/* Nav Divider */
+.nav-divider-container {
+    padding: 0.75rem 0.75rem;
+    position: relative;
+    user-select: none;
+}
+
+.nav-divider {
+    height: 1px;
+    background: var(--border-color);
+    width: 100%;
+    transition: all 0.2s;
+}
+
+.is-logged-in .nav-divider-container {
+    cursor: grab;
+}
+
+.nav-divider-actions {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    display: none;
+    background: var(--bg-sidebar);
+    padding: 0 4px;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+}
+
+.is-logged-in .nav-divider-container:hover .nav-divider-actions {
+    display: flex;
+}
+
+.is-logged-in .nav-divider-container:hover .nav-divider {
+    background: var(--primary);
+    box-shadow: 0 0 4px rgba(79, 70, 229, 0.2);
+}
+
+.nav-item.dragging,
+.nav-divider-container.dragging {
+    opacity: 0.5;
+    background: #e2e8f0;
 }
 
 .sidebar-actions {

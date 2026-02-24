@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "scripts": {
     "build": "node build.js",
-    "deploy": "node build.js && npx wrangler pages deploy dist --project-name site-blogs"
+    "deploy:pages": "node build.js && cmd /c \"npx wrangler pages deploy dist --project-name site-blogs --commit-dirty=true\"",
+    "deploy:worker": "node build.js && cmd /c \"cd worker && npx wrangler deploy\"",
+    "deploy": "npm run deploy:pages && npm run deploy:worker"
   },
   "dependencies": {
     "dotenv": "^16.4.5"

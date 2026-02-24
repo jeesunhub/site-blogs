@@ -5,8 +5,8 @@ compatibility_date = "2024-01-01"
 
 
 [vars]
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = "pk_test_d2hvbGUtd2VldmlsLTkzLmNsZXJrLmFjY291bnRzLmRldiQ"
-CLERK_SECRET_KEY = "sk_test_ZBSoWZZk6i275elkXLcE4VaOYH7bzuLGRlqLY4KgHG"
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = "__CLERK_PUBLISHABLE_KEY__"
+CLERK_SECRET_KEY = "__CLERK_SECRET_KEY__"
 
 [[kv_namespaces]]
 binding = "MEDIA_KV"
