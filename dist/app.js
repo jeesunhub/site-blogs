@@ -140,6 +140,7 @@ const sugarAppLink = document.getElementById('sugar-app-link');
 const editShortcutBtn = document.getElementById('edit-shortcut-btn');
 const addDividerBtn = document.getElementById('add-divider-btn');
 const themeToggleBtn = document.getElementById('theme-toggle');
+const API_BASE_URL = 'https://site-blogs.iamjeesun.workers.dev';
 
 // App State
 let currentState = {
@@ -161,34 +162,45 @@ const tocList = document.getElementById('toc-list');
 
 // Initialize
 async function init() {
-    // Load persisted data
-    const savedRolesData = localStorage.getItem('sugar_roles_data');
+    // 1. Try to load from Server first
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/data`);
+        if (response.ok) {
+            const serverData = await response.json();
+            if (serverData.rolesData) rolesData = serverData.rolesData;
+            if (serverData.mediaAssets) mediaAssets = serverData.mediaAssets;
+            if (serverData.sugarAppUrl) currentState.sugarAppUrl = serverData.sugarAppUrl;
+        }
+    } catch (err) {
+        console.warn('Server data load failed, falling back to local:', err);
+        // Fallback to local storage if server is down
+        const savedRolesData = localStorage.getItem('sugar_roles_data');
+        if (savedRolesData) rolesData = JSON.parse(savedRolesData);
+        const savedMedia = localStorage.getItem('sugar_media');
+        if (savedMedia) mediaAssets = JSON.parse(savedMedia);
+    }
+
+    // 2. Local settings (Theme, Role)
     const savedRole = localStorage.getItem('sugar_current_role');
-    const savedMedia = localStorage.getItem('sugar_media');
     const savedTheme = localStorage.getItem('sugar_theme');
+    const savedShortcutUrl = localStorage.getItem('sugar_app_url');
 
     if (savedTheme) {
         currentState.theme = savedTheme;
         applyTheme();
     }
 
-    if (savedRolesData) {
-        rolesData = JSON.parse(savedRolesData);
+    if (savedShortcutUrl && !currentState.sugarAppUrl) {
+        currentState.sugarAppUrl = savedShortcutUrl;
     }
 
-    if (savedMedia) {
-        mediaAssets = JSON.parse(savedMedia);
-    } else {
+    if (!mediaAssets || mediaAssets.length === 0) {
         mediaAssets = [
             'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=400',
             'https://images.unsplash.com/photo-1554469384-e58fb162020a?w=400'
         ];
     }
 
-    const savedShortcutUrl = localStorage.getItem('sugar_app_url');
-    if (savedShortcutUrl) {
-        currentState.sugarAppUrl = savedShortcutUrl;
-    }
     updateShortcutUI();
 
     if (savedRole && rolesData[savedRole]) {
@@ -200,10 +212,9 @@ async function init() {
     guideData = rolesData[currentState.currentRole].guides;
     currentState.activePage = menuStructure[0].items[0].id;
 
-    // Clerk Initialization
+    // 3. Clerk Initialization
     try {
         if (!window.Clerk) {
-            // Wait for script to load
             await new Promise(resolve => {
                 const check = setInterval(() => {
                     if (window.Clerk) {
@@ -238,12 +249,36 @@ async function init() {
     setupEventListeners();
 }
 
-function persistAll() {
+async function persistAll() {
+    // Save to LocalStorage for offline fallback
     localStorage.setItem('sugar_roles_data', JSON.stringify(rolesData));
     localStorage.setItem('sugar_current_role', currentState.currentRole);
     localStorage.setItem('sugar_media', JSON.stringify(mediaAssets));
     localStorage.setItem('sugar_app_url', currentState.sugarAppUrl);
     localStorage.setItem('sugar_theme', currentState.theme);
+
+    // Save to Server KV
+    if (currentState.isLoggedIn) {
+        try {
+            const dataToSave = {
+                rolesData,
+                mediaAssets,
+                sugarAppUrl: currentState.sugarAppUrl
+            };
+
+            const response = await fetch(`${API_BASE_URL}/api/data`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dataToSave)
+            });
+
+            if (response.ok) {
+                console.log('Site data synced to server');
+            }
+        } catch (err) {
+            console.error('Server sync failed:', err);
+        }
+    }
 }
 
 function switchRole(role) {
@@ -607,9 +642,8 @@ async function handleFileUpload(e) {
     const formData = new FormData();
     formData.append('file', file);
 
-    const apiBaseUrl = 'https://site-blogs.iamjeesun.workers.dev';
     try {
-        const response = await fetch(`${apiBaseUrl}/api/upload`, {
+        const response = await fetch(`${API_BASE_URL}/api/upload`, {
             method: 'POST',
             body: formData
         });

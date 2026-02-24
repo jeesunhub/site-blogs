@@ -5,7 +5,8 @@
     "build": "node build.js",
     "deploy:pages": "node build.js && cmd /c \"npx wrangler pages deploy dist --project-name site-blogs --commit-dirty=true\"",
     "deploy:worker": "node build.js && cmd /c \"cd worker && npx wrangler deploy\"",
-    "deploy": "npm run deploy:pages && npm run deploy:worker"
+    "deploy": "npm run deploy:pages && npm run deploy:worker",
+    "start": "npx serve dist"
   },
   "dependencies": {
     "dotenv": "^16.4.5"

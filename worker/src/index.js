@@ -6,7 +6,7 @@ export default {
         const corsHeaders = {
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
         };
 
         if (request.method === 'OPTIONS') {
@@ -59,7 +59,28 @@ export default {
             }
         }
 
-        return new Response('Worker is running. Use /media/:id or POST /api/upload', {
+        // 3. Get Site Data
+        if (url.pathname === '/api/data' && request.method === 'GET') {
+            const data = await env.MEDIA_KV.get('site_data');
+            return new Response(data || '{}', {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+
+        // 4. Save Site Data (Simplified: in production, verify Clerk session)
+        if (url.pathname === '/api/data' && request.method === 'POST') {
+            try {
+                const data = await request.text();
+                await env.MEDIA_KV.put('site_data', data);
+                return new Response(JSON.stringify({ success: true }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            } catch (err) {
+                return new Response('Save failed', { status: 500, headers: corsHeaders });
+            }
+        }
+
+        return new Response('Worker is running.', {
             status: 200,
             headers: { 'Content-Type': 'text/plain', ...corsHeaders }
         });
