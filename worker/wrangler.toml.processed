@@ -1,0 +1,10 @@
+name = "site-blogs"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+[site]
+bucket = "../frontend"
+
+[vars]
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = "pk_test_d2hvbGUtd2VldmlsLTkzLmNsZXJrLmFjY291bnRzLmRldiQ"
+CLERK_SECRET_KEY = "sk_test_ZBSoWZZk6i275elkXLcE4VaOYH7bzuLGRlqLY4KgHG"

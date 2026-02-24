@@ -1,0 +1,11 @@
+{
+  "name": "landlord-app-guide",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "node build.js",
+    "deploy": "node build.js && npx wrangler pages deploy dist --project-name site-blogs"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5"
+  }
+}
