@@ -57,7 +57,7 @@ export default {
             }
 
             // 3. Get Site Data
-            if (url.pathname === '/api/data' && request.method === 'GET') {
+            if ((url.pathname === '/api/data' || url.pathname === '/api/data/') && request.method === 'GET') {
                 const data = await env.MEDIA_KV.get('site_data');
                 return new Response(data || '{}', {
                     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -65,7 +65,7 @@ export default {
             }
 
             // 4. Save Site Data (Simplified: in production, verify Clerk session)
-            if (url.pathname === '/api/data' && request.method === 'POST') {
+            if ((url.pathname === '/api/data' || url.pathname === '/api/data/') && request.method === 'POST') {
                 const data = await request.text();
                 await env.MEDIA_KV.put('site_data', data);
                 return new Response(JSON.stringify({ success: true }), {

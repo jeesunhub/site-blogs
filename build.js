@@ -36,11 +36,15 @@ function processFile(relativePath) {
     // Replace Clerk Publishable Key
     if (process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
         content = content.replace(/__CLERK_PUBLISHABLE_KEY__/g, process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
+        if (filename.endsWith('.html')) console.log(`Replaced Clerk Key in ${filename}`);
+    } else {
+        if (filename.endsWith('.html')) console.warn(`WARNING: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY not found in env. Replacement skipped for ${filename}`);
     }
 
     // Replace API Base URL
     const apiBaseUrl = process.env.WORKER_URL || 'https://site-blogs.iamjeesun.workers.dev';
     content = content.replace(/__API_BASE_URL__/g, apiBaseUrl);
+    if (filename.endsWith('app.js')) console.log(`Replaced API_BASE_URL with ${apiBaseUrl} in ${filename}`);
 
     fs.writeFileSync(dest, content);
     console.log(`Processed ${relativePath}`);

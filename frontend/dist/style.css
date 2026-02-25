@@ -513,7 +513,7 @@ body {
     box-shadow: var(--shadow-md);
     display: block;
     background-color: #ffffff;
-    padding: 0.5rem;
+    padding: 1px;
 }
 
 .doc-content ul,

@@ -231,12 +231,19 @@ async function init() {
 
         await Clerk.load();
 
-        if (Clerk.user) {
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const localSession = isLocal ? JSON.parse(sessionStorage.getItem('local_test_user')) : null;
+
+        if (Clerk.user || localSession) {
             currentState.isLoggedIn = true;
-            currentState.currentUser = {
-                name: Clerk.user.fullName || Clerk.user.firstName,
-                email: Clerk.user.primaryEmailAddress.emailAddress
-            };
+            if (Clerk.user) {
+                currentState.currentUser = {
+                    name: Clerk.user.fullName || Clerk.user.firstName,
+                    email: Clerk.user.primaryEmailAddress.emailAddress
+                };
+            } else {
+                currentState.currentUser = localSession;
+            }
         } else {
             currentState.isLoggedIn = false;
             currentState.currentUser = null;
@@ -695,8 +702,11 @@ function renderMediaLibrary() {
         item.innerHTML = `
             <div style="height: 100px; background: url('${url}') center/cover no-repeat;"></div>
             <div style="padding: 0.6rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
-                <div class="media-info-text" style="font-size: 0.65rem; color: var(--text-muted); margin-bottom: 6px; text-align: center; font-weight: 500;">
-                    ${formatBytes(size)}${resolutionText}
+                <div class="media-info-wrapper" style="display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 6px;">
+                    <div class="media-info-text" style="font-size: 0.65rem; color: var(--text-muted); font-weight: 500;">
+                        ${formatBytes(size)}${resolutionText}
+                    </div>
+                    <span class="edit-res-btn" style="cursor: pointer; font-size: 0.65rem; color: var(--text-muted); padding: 2px;" title="해상도 수정">✏️</span>
                 </div>
                 <div style="display: flex; gap: 4px;">
                     <button class="btn btn-ghost copy-media-url" style="flex: 1; font-size: 0.65rem; padding: 4px; border: 1px solid var(--border-color); color: var(--text-main);">주소 복사</button>
@@ -719,6 +729,27 @@ function renderMediaLibrary() {
                 }
             });
         }
+
+        item.querySelector('.edit-res-btn').addEventListener('click', () => {
+            const newRes = prompt('새 해상도를 입력하세요 (가로x세로):', `${asset.width || 0}x${asset.height || 0}`);
+            if (newRes) {
+                const parts = newRes.split('x');
+                if (parts.length === 2) {
+                    const w = parseInt(parts[0].trim());
+                    const h = parseInt(parts[1].trim());
+                    if (!isNaN(w) && !isNaN(h)) {
+                        asset.width = w;
+                        asset.height = h;
+                        persistAll();
+                        renderMediaLibrary();
+                    } else {
+                        alert('숫자를 입력해주세요.');
+                    }
+                } else {
+                    alert('형식이 올바르지 않습니다 (예: 1024x768).');
+                }
+            }
+        });
 
         item.querySelector('.copy-media-url').addEventListener('click', () => {
             navigator.clipboard.writeText(url).then(() => alert('이미지 주소가 복사되었습니다.'));
@@ -1037,28 +1068,73 @@ function updateAuthUI() {
     const signInDiv = document.getElementById('clerk-sign-in');
     const userButtonDiv = document.getElementById('clerk-user-button');
 
-    if (Clerk.user) {
+    // Check if we have a Clerk user OR a local test session
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const localSession = isLocal ? JSON.parse(sessionStorage.getItem('local_test_user')) : null;
+
+    if (Clerk.user || localSession) {
         signInDiv.innerHTML = '';
-        Clerk.mountUserButton(userButtonDiv, {
-            afterSignOutUrl: window.location.href
-        });
+        if (Clerk.user) {
+            Clerk.mountUserButton(userButtonDiv, {
+                afterSignOutUrl: window.location.href
+            });
+            currentState.currentUser = {
+                name: Clerk.user.fullName || Clerk.user.firstName,
+                email: Clerk.user.primaryEmailAddress.emailAddress
+            };
+        } else if (localSession) {
+            userButtonDiv.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">${localSession.name} (Test)</span>
+                    <button id="local-logout-btn" class="btn btn-ghost" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;">로그아웃</button>
+                </div>
+            `;
+            currentState.currentUser = localSession;
+            document.getElementById('local-logout-btn').addEventListener('click', () => {
+                sessionStorage.removeItem('local_test_user');
+                location.reload();
+            });
+        }
 
         currentState.isLoggedIn = true;
-        currentState.currentUser = {
-            name: Clerk.user.fullName || Clerk.user.firstName,
-            email: Clerk.user.primaryEmailAddress.emailAddress
-        };
     } else {
         userButtonDiv.innerHTML = '';
 
-        // Clear and add a reliable sign-in button
+        // Standard Login Button
         signInDiv.innerHTML = '<button id="explicit-login-btn" class="btn btn-outline">로그인</button>';
         document.getElementById('explicit-login-btn').addEventListener('click', () => {
             Clerk.openSignIn();
         });
 
+        // Add Local Test Login for localhost
+        if (isLocal) {
+            const testLoginDiv = document.createElement('div');
+            testLoginDiv.style.cssText = 'margin-top: 0.5rem; display: flex; gap: 0.5rem;';
+            testLoginDiv.innerHTML = `
+                <input type="text" id="test-email-input" placeholder="test 이메일 입력" 
+                    style="padding: 0.3rem 0.5rem; font-size: 0.75rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-main); color: var(--text-main);">
+                <button id="test-login-btn" class="btn btn-ghost" style="font-size: 0.75rem; padding: 0.3rem 0.5rem;">테스트 로그인</button>
+            `;
+            signInDiv.appendChild(testLoginDiv);
+
+            document.getElementById('test-login-btn').addEventListener('click', () => {
+                const email = document.getElementById('test-email-input').value.trim();
+                if (email.includes('test')) {
+                    const testUser = {
+                        name: '테스트 계정',
+                        email: email
+                    };
+                    sessionStorage.setItem('local_test_user', JSON.stringify(testUser));
+                    location.reload();
+                } else {
+                    alert('이메일에 "test"가 포함되어야 합니다.');
+                }
+            });
+        }
+
         // Also try to mount the standard Clerk button if possible
         const mountDiv = document.createElement('div');
+        mountDiv.style.marginTop = '0.5rem';
         signInDiv.appendChild(mountDiv);
         Clerk.mountSignInButton(mountDiv, {
             mode: 'modal'
