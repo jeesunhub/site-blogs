@@ -36,9 +36,13 @@ function processFile(relativePath) {
     // Replace Clerk Publishable Key
     if (process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
         content = content.replace(/__CLERK_PUBLISHABLE_KEY__/g, process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
-        if (relativePath.endsWith('.html')) console.log(`Replaced Clerk Key in ${relativePath}`);
+        if (relativePath.endsWith('.html')) console.log(`[BUILD] Replaced Clerk Key in ${relativePath}`);
     } else {
-        if (relativePath.endsWith('.html')) console.warn(`WARNING: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY not found in env. Replacement skipped for ${relativePath}`);
+        if (relativePath.endsWith('.html')) {
+            console.error(`[FATAL ERROR] NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is missing!`);
+            console.error(`Please add it to Cloudflare Pages -> Settings -> Environment Variables -> Build Environment`);
+            process.exit(1); // Stop the build
+        }
     }
 
     // Replace API Base URL
