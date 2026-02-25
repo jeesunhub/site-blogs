@@ -65,12 +65,20 @@ const wranglerDest = path.resolve(__dirname, 'worker', 'wrangler.toml');
 
 if (fs.existsSync(wranglerSrc)) {
     let content = fs.readFileSync(wranglerSrc, 'utf8');
+    const apiBaseUrl = process.env.WORKER_URL || 'https://site-blogs.iamjeesun.workers.dev';
+
     if (process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
         content = content.replace(/__CLERK_PUBLISHABLE_KEY__/g, process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
+        console.log('[BUILD] Replaced Clerk Publishable Key in wrangler.toml');
     }
     if (process.env.CLERK_SECRET_KEY) {
         content = content.replace(/__CLERK_SECRET_KEY__/g, process.env.CLERK_SECRET_KEY);
+        console.log('[BUILD] Replaced Clerk Secret Key in wrangler.toml');
     }
+
+    content = content.replace(/__API_BASE_URL__/g, apiBaseUrl);
+    console.log(`[BUILD] Replaced WORKER_URL with ${apiBaseUrl} in wrangler.toml`);
+
     fs.writeFileSync(wranglerDest, content);
     console.log('Processed wrangler.toml.template -> wrangler.toml');
 }
