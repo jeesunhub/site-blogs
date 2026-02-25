@@ -55,7 +55,7 @@ function processFile(relativePath) {
     }
 
     // Replace API Base URL
-    const apiBaseUrl = process.env.WORKER_URL || 'https://site-blogs.iamjeesun.workers.dev';
+    const apiBaseUrl = process.env.WORKER_URL || 'https://site-blogs-api.iamjeesun.workers.dev';
     content = content.replace(/__API_BASE_URL__/g, apiBaseUrl);
     if (relativePath.endsWith('app.js')) console.log(`[BUILD] Replaced API_BASE_URL with ${apiBaseUrl} in ${relativePath}`);
 

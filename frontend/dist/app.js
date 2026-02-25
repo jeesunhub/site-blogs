@@ -152,7 +152,7 @@ const editShortcutBtn = document.getElementById('edit-shortcut-btn');
 const addDividerBtn = document.getElementById('add-divider-btn');
 const themeToggleBtn = document.getElementById('theme-toggle');
 const deployBtn = document.getElementById('deploy-btn');
-const API_BASE_URL = 'https://site-blogs.iamjeesun.workers.dev';
+const API_BASE_URL = 'https://site-blogs-api.iamjeesun.workers.dev';
 
 // App State
 let currentState = {

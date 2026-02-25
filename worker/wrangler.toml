@@ -7,7 +7,7 @@ compatibility_date = "2024-01-01"
 [vars]
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = "pk_test_d2hvbGUtd2VldmlsLTkzLmNsZXJrLmFjY291bnRzLmRldiQ"
 CLERK_SECRET_KEY = "sk_test_ZBSoWZZk6i275elkXLcE4VaOYH7bzuLGRlqLY4KgHG"
-WORKER_URL = "https://site-blogs.iamjeesun.workers.dev"
+WORKER_URL = "https://site-blogs-api.iamjeesun.workers.dev"
 
 [[kv_namespaces]]
 binding = "MEDIA_KV"
