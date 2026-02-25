@@ -16,7 +16,6 @@ function processFile(relativePath) {
     const dest = path.resolve(distPath, relativePath);
 
     // CRITICAL: Stop if we are trying to process the dist directory itself
-    // Path.resolve handles different separators and trailing slashes
     if (src === distPath || src.startsWith(distPath + path.sep)) {
         return;
     }
@@ -48,7 +47,7 @@ function processFile(relativePath) {
     // Replace API Base URL
     const apiBaseUrl = process.env.WORKER_URL || 'https://site-blogs.iamjeesun.workers.dev';
     content = content.replace(/__API_BASE_URL__/g, apiBaseUrl);
-    if (relativePath.endsWith('app.js')) console.log(`Replaced API_BASE_URL with ${apiBaseUrl} in ${relativePath}`);
+    if (relativePath.endsWith('app.js')) console.log(`[BUILD] Replaced API_BASE_URL with ${apiBaseUrl} in ${relativePath}`);
 
     fs.writeFileSync(dest, content);
     console.log(`Processed ${relativePath}`);
