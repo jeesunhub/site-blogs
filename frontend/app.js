@@ -137,6 +137,17 @@ const saveMenuBtn = document.getElementById('save-menu');
 const appContainer = document.getElementById('app');
 const roleSelect = document.getElementById('role-select');
 const sugarAppLink = document.getElementById('sugar-app-link');
+function formatDate(date) {
+    if (!date) return '';
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const mins = String(d.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${mins}`;
+}
+
 const editShortcutBtn = document.getElementById('edit-shortcut-btn');
 const addDividerBtn = document.getElementById('add-divider-btn');
 const themeToggleBtn = document.getElementById('theme-toggle');
@@ -704,16 +715,19 @@ function renderMediaLibrary() {
         const item = document.createElement('div');
         item.style.cssText = 'border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: var(--bg-main); position: relative; display: flex; flex-direction: column;';
 
-        const resolutionText = asset.width ? ` • ${asset.width}x${asset.height}` : '';
+        const dateText = asset.updatedAt ? `<div style="font-size: 0.6rem; color: var(--text-muted); opacity: 0.8;">${formatDate(asset.updatedAt)}</div>` : '';
 
         item.innerHTML = `
             <div style="height: 100px; background: url('${url}') center/cover no-repeat;"></div>
             <div style="padding: 0.6rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
-                <div class="media-info-wrapper" style="display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 6px;">
-                    <div class="media-info-text" style="font-size: 0.65rem; color: var(--text-muted); font-weight: 500;">
-                        ${formatBytes(size)}${resolutionText}
+                <div class="media-info-wrapper" style="display: flex; flex-direction: column; align-items: center; gap: 2px; margin-bottom: 6px;">
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                        <div class="media-info-text" style="font-size: 0.65rem; color: var(--text-muted); font-weight: 500;">
+                            ${formatBytes(size)}${resolutionText}
+                        </div>
+                        <span class="edit-res-btn" style="cursor: pointer; font-size: 0.65rem; color: var(--text-muted); padding: 2px;" title="해상도 수정">✏️</span>
                     </div>
-                    <span class="edit-res-btn" style="cursor: pointer; font-size: 0.65rem; color: var(--text-muted); padding: 2px;" title="해상도 수정">✏️</span>
+                    ${dateText}
                 </div>
                 <div style="display: flex; gap: 4px;">
                     <button class="btn btn-ghost copy-media-url" style="flex: 1; font-size: 0.65rem; padding: 4px; border: 1px solid var(--border-color); color: var(--text-main);">주소 복사</button>
@@ -747,6 +761,7 @@ function renderMediaLibrary() {
                     if (!isNaN(w) && !isNaN(h)) {
                         asset.width = w;
                         asset.height = h;
+                        asset.updatedAt = new Date().toISOString();
                         persistAll();
                         renderMediaLibrary();
                     } else {
@@ -783,7 +798,8 @@ async function addMedia() {
         url,
         size: 0,
         width: dims.width || 0,
-        height: dims.height || 0
+        height: dims.height || 0,
+        updatedAt: new Date().toISOString()
     });
     newMediaUrlInput.value = '';
     persistAll();
@@ -828,7 +844,8 @@ async function handleFileUpload(e) {
             size: result.size,
             name: file.name,
             width: dims.width,
-            height: dims.height
+            height: dims.height,
+            updatedAt: new Date().toISOString()
         });
 
         persistAll();
