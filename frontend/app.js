@@ -853,6 +853,7 @@ function loadPage(pageId) {
     // Render Markdown to HTML
     const htmlContent = marked.parse(data.content.trim());
     docContentDisplay.innerHTML = htmlContent;
+    applyMediaDimensions(docContentDisplay);
     breadcrumbCurrent.textContent = data.title;
 
     // Update Controls Visibility
@@ -1000,10 +1001,28 @@ function togglePreview() {
     } else {
         // Render and show preview
         editorPreview.innerHTML = marked.parse(contentEditor.value);
+        applyMediaDimensions(editorPreview);
         contentEditor.style.display = 'none';
         editorPreview.style.display = 'block';
         previewToggleBtn.textContent = '수정하기 (Editor)';
     }
+}
+
+function applyMediaDimensions(container) {
+    if (!container) return;
+    const images = container.querySelectorAll('img');
+    images.forEach(img => {
+        // Try to find matching asset in mediaAssets
+        const asset = mediaAssets.find(a => a.url === img.getAttribute('src'));
+        if (asset && asset.width && asset.height) {
+            img.style.width = asset.width + 'px';
+            img.style.height = 'auto'; // Keep aspect ratio if only width is critical, but user specified both
+            // If user wants exact resolution:
+            img.width = asset.width;
+            img.height = asset.height;
+            img.style.maxWidth = '100%';
+        }
+    });
 }
 
 function exitEditMode() {
@@ -1021,6 +1040,7 @@ function saveEdits() {
 
     // Render Markdown to HTML and update display
     docContentDisplay.innerHTML = marked.parse(markdownContent);
+    applyMediaDimensions(docContentDisplay);
 
     persistAll();
     console.log(`Saved Markdown for ${currentState.activePage}`);
