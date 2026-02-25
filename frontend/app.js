@@ -178,7 +178,7 @@ const sidebarOverlay = document.getElementById('sidebar-overlay');
 // Initialize
 async function init() {
     // 1. Try to load from Server first
-    const dataUrl = `${API_BASE_URL}/api/data`;
+    const dataUrl = `${API_BASE_URL}/api/data?_=${Date.now()}`;
     console.log(`[INIT] Fetching data from: ${dataUrl}`);
     try {
         const response = await fetch(dataUrl);

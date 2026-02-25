@@ -45,8 +45,11 @@ export default {
                 return createResponse({
                     msg: 'Worker Debug',
                     path: url.pathname,
+                    normalized_path: path,
                     method: request.method,
-                    kv_ready: !!env.MEDIA_KV
+                    origin: request.headers.get('Origin'),
+                    kv_ready: !!env.MEDIA_KV,
+                    version: '1.0.3'
                 });
             }
 
