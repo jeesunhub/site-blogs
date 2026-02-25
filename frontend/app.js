@@ -252,6 +252,7 @@ async function init() {
         updateAuthUI();
     } catch (err) {
         console.error('Clerk load failed:', err);
+        updateAuthUI(); // Still try to update UI (might show local login if on localhost)
     }
 
     renderMenu();
@@ -1075,9 +1076,11 @@ function updateAuthUI() {
     if (Clerk.user || localSession) {
         signInDiv.innerHTML = '';
         if (Clerk.user) {
-            Clerk.mountUserButton(userButtonDiv, {
-                afterSignOutUrl: window.location.href
-            });
+            if (typeof Clerk.mountUserButton === 'function') {
+                Clerk.mountUserButton(userButtonDiv, {
+                    afterSignOutUrl: window.location.href
+                });
+            }
             currentState.currentUser = {
                 name: Clerk.user.fullName || Clerk.user.firstName,
                 email: Clerk.user.primaryEmailAddress.emailAddress
@@ -1090,7 +1093,7 @@ function updateAuthUI() {
                 </div>
             `;
             currentState.currentUser = localSession;
-            document.getElementById('local-logout-btn').addEventListener('click', () => {
+            document.getElementById('local-logout-btn')?.addEventListener('click', () => {
                 sessionStorage.removeItem('local_test_user');
                 location.reload();
             });
@@ -1102,8 +1105,12 @@ function updateAuthUI() {
 
         // Standard Login Button
         signInDiv.innerHTML = '<button id="explicit-login-btn" class="btn btn-outline">로그인</button>';
-        document.getElementById('explicit-login-btn').addEventListener('click', () => {
-            Clerk.openSignIn();
+        document.getElementById('explicit-login-btn')?.addEventListener('click', () => {
+            if (typeof Clerk.openSignIn === 'function') {
+                Clerk.openSignIn();
+            } else {
+                alert('로그인 모듈을 불러오는 중입니다. 잠시 후 상단 "로그인" 버튼을 다시 클릭해 주세요.');
+            }
         });
 
         // Add Local Test Login for localhost
@@ -1117,7 +1124,7 @@ function updateAuthUI() {
             `;
             signInDiv.appendChild(testLoginDiv);
 
-            document.getElementById('test-login-btn').addEventListener('click', () => {
+            document.getElementById('test-login-btn')?.addEventListener('click', () => {
                 const email = document.getElementById('test-email-input').value.trim();
                 if (email.includes('test')) {
                     const testUser = {
@@ -1133,12 +1140,14 @@ function updateAuthUI() {
         }
 
         // Also try to mount the standard Clerk button if possible
-        const mountDiv = document.createElement('div');
-        mountDiv.style.marginTop = '0.5rem';
-        signInDiv.appendChild(mountDiv);
-        Clerk.mountSignInButton(mountDiv, {
-            mode: 'modal'
-        });
+        if (typeof Clerk.mountSignInButton === 'function') {
+            const mountDiv = document.createElement('div');
+            mountDiv.style.marginTop = '0.5rem';
+            signInDiv.appendChild(mountDiv);
+            Clerk.mountSignInButton(mountDiv, {
+                mode: 'modal'
+            });
+        }
 
         currentState.isLoggedIn = false;
         currentState.currentUser = null;
