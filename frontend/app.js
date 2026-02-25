@@ -231,7 +231,14 @@ async function init() {
 
     menuStructure = rolesData[currentState.currentRole].menu;
     guideData = rolesData[currentState.currentRole].guides;
-    currentState.activePage = menuStructure[0].items[0].id;
+
+    // Check URL hash for direct landing
+    const hash = window.location.hash.replace('#', '');
+    if (hash && guideData[hash]) {
+        currentState.activePage = hash;
+    } else {
+        currentState.activePage = menuStructure[0].items[0].id;
+    }
 
     // 3. Clerk Initialization
     try {
@@ -868,6 +875,11 @@ function loadPage(pageId) {
     currentState.activePage = pageId;
     currentState.isEditing = false;
 
+    // Update URL hash without jumping
+    if (window.location.hash !== `#${pageId}`) {
+        history.pushState(null, null, `#${pageId}`);
+    }
+
     // Render Markdown to HTML
     const htmlContent = marked.parse(data.content.trim());
     docContentDisplay.innerHTML = htmlContent;
@@ -1107,6 +1119,14 @@ function setupEventListeners() {
     });
 
     editShortcutBtn.addEventListener('click', editShortcut);
+
+    // Handle back/forward buttons
+    window.addEventListener('hashchange', () => {
+        const hash = window.location.hash.replace('#', '');
+        if (hash && guideData[hash] && currentState.activePage !== hash) {
+            loadPage(hash);
+        }
+    });
 }
 
 function updateAuthUI() {
