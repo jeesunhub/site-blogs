@@ -1,29 +1,38 @@
 export default {
     async fetch(request, env, ctx) {
-        const url = new URL(request.url);
-
-        // CORS headers
         const corsHeaders = {
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
             'Access-Control-Allow-Headers': 'Content-Type, Authorization',
         };
 
+        const respond = (data, status = 200, type = 'application/json') => {
+            const body = typeof data === 'string' ? data : JSON.stringify(data);
+            return new Response(body, {
+                status,
+                headers: { ...corsHeaders, 'Content-Type': type }
+            });
+        };
+
         if (request.method === 'OPTIONS') {
             return new Response(null, { headers: corsHeaders });
         }
 
+        const url = new URL(request.url);
+
         try {
+            // Health Check
+            if (url.pathname === '/api/health') return respond({ status: 'ok', version: '1.0.1', timestamp: new Date().toISOString() });
+
             // 1. Serve Uploaded Media
             if (url.pathname.startsWith('/media/')) {
                 const key = url.pathname.replace('/media/', '');
                 const image = await env.MEDIA_KV.get(key, 'arrayBuffer');
                 if (image) {
                     let contentType = 'image/png';
-                    if (key.endsWith('.jpg') || key.endsWith('.jpeg')) contentType = 'image/jpeg';
-                    if (key.endsWith('.gif')) contentType = 'image/gif';
-                    if (key.endsWith('.svg')) contentType = 'image/svg+xml';
-                    if (key.endsWith('.webp')) contentType = 'image/webp';
+                    const ext = key.split('.').pop().toLowerCase();
+                    const mimeTypes = { 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'gif': 'image/gif', 'svg': 'image/svg+xml', 'webp': 'image/webp' };
+                    contentType = mimeTypes[ext] || 'image/png';
 
                     return new Response(image, {
                         headers: {
@@ -33,14 +42,14 @@ export default {
                         }
                     });
                 }
-                return new Response('Image not found', { status: 404, headers: corsHeaders });
+                return respond('Image not found', 404, 'text/plain');
             }
 
             // 2. Handle Image Upload
             if (url.pathname === '/api/upload' && request.method === 'POST') {
                 const formData = await request.formData();
                 const file = formData.get('file');
-                if (!file) return new Response('No file uploaded', { status: 400, headers: corsHeaders });
+                if (!file) return respond({ error: 'No file uploaded' }, 400);
 
                 const filename = file.name || `${Date.now()}.png`;
                 const fileExt = filename.split('.').pop();
@@ -48,41 +57,44 @@ export default {
 
                 await env.MEDIA_KV.put(key, await file.arrayBuffer());
 
-                return new Response(JSON.stringify({
+                return respond({
                     url: `${url.origin}/media/${key}`,
                     size: file.size
-                }), {
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
                 });
             }
 
             // 3. Get Site Data
-            if ((url.pathname === '/api/data' || url.pathname === '/api/data/') && request.method === 'GET') {
-                const data = await env.MEDIA_KV.get('site_data');
-                return new Response(data || '{}', {
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                });
+            if (url.pathname.replace(/\/$/, '') === '/api/data' && request.method === 'GET') {
+                try {
+                    const data = await env.MEDIA_KV.get('site_data');
+                    return respond(data || '{}');
+                } catch (kvErr) {
+                    return respond({ error: 'KV Error', details: kvErr.message }, 500);
+                }
             }
 
-            // 4. Save Site Data (Simplified: in production, verify Clerk session)
-            if ((url.pathname === '/api/data' || url.pathname === '/api/data/') && request.method === 'POST') {
+            // 4. Save Site Data
+            if (url.pathname.replace(/\/$/, '') === '/api/data' && request.method === 'POST') {
                 const data = await request.text();
                 await env.MEDIA_KV.put('site_data', data);
-                return new Response(JSON.stringify({ success: true }), {
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                return respond({ success: true });
+            }
+
+            // Debug endpoint
+            if (url.pathname === '/api/debug') {
+                return respond({
+                    msg: 'Worker Debug Info',
+                    timestamp: new Date().toISOString(),
+                    kv_bound: !!env.MEDIA_KV,
+                    pathname: url.pathname,
+                    method: request.method
                 });
             }
 
-            return new Response('Path not found', {
-                status: 404,
-                headers: { 'Content-Type': 'text/plain', ...corsHeaders }
-            });
+            return respond(`Path not found: ${url.pathname}`, 404, 'text/plain');
 
         } catch (err) {
-            return new Response(JSON.stringify({ error: err.message }), {
-                status: 500,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            });
+            return respond({ error: err.message }, 500);
         }
     },
 };

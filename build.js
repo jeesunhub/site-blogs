@@ -34,8 +34,18 @@ function processFile(relativePath) {
 
     // Replace Clerk Publishable Key
     if (process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
-        content = content.replace(/__CLERK_PUBLISHABLE_KEY__/g, process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
-        if (relativePath.endsWith('.html')) console.log(`[BUILD] Replaced Clerk Key in ${relativePath}`);
+        const key = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+        const maskedKey = key.substring(0, 10) + '...' + key.substring(key.length - 4);
+        content = content.replace(/__CLERK_PUBLISHABLE_KEY__/g, key);
+
+        if (relativePath.endsWith('.html')) {
+            console.log(`[BUILD] Replaced Clerk Key placeholder with: ${maskedKey} in ${relativePath}`);
+            // Verification check
+            if (content.includes('__CLERK_PUBLISHABLE_KEY__')) {
+                console.error(`[FATAL ERROR] Replacement failed in ${relativePath}! Placeholder still exists.`);
+                process.exit(1);
+            }
+        }
     } else {
         if (relativePath.endsWith('.html')) {
             console.error(`[FATAL ERROR] NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is missing!`);

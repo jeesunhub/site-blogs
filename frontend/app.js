@@ -167,16 +167,22 @@ const sidebarOverlay = document.getElementById('sidebar-overlay');
 // Initialize
 async function init() {
     // 1. Try to load from Server first
+    const dataUrl = `${API_BASE_URL}/api/data`;
+    console.log(`[INIT] Fetching data from: ${dataUrl}`);
     try {
-        const response = await fetch(`${API_BASE_URL}/api/data`);
+        const response = await fetch(dataUrl);
         if (response.ok) {
             const serverData = await response.json();
             if (serverData.rolesData) rolesData = serverData.rolesData;
             if (serverData.mediaAssets) mediaAssets = serverData.mediaAssets;
             if (serverData.sugarAppUrl) currentState.sugarAppUrl = serverData.sugarAppUrl;
+            console.log('[INIT] Server data loaded successfully');
+        } else {
+            console.warn(`[INIT] Server returned status: ${response.status}. Falling back to local data.`);
+            throw new Error(`Status ${response.status}`);
         }
     } catch (err) {
-        console.warn('Server data load failed, falling back to local:', err);
+        console.error('[INIT] Server data load failed (CORS or Network Error):', err);
         // Fallback to local storage if server is down
         const savedRolesData = localStorage.getItem('sugar_roles_data');
         if (savedRolesData) rolesData = JSON.parse(savedRolesData);
