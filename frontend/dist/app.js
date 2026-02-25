@@ -715,6 +715,7 @@ function renderMediaLibrary() {
         const item = document.createElement('div');
         item.style.cssText = 'border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: var(--bg-main); position: relative; display: flex; flex-direction: column;';
 
+        const resolutionText = asset.width ? ` • ${asset.width}x${asset.height}` : '';
         const dateText = asset.updatedAt ? `<div style="font-size: 0.6rem; color: var(--text-muted); opacity: 0.8;">${formatDate(asset.updatedAt)}</div>` : '';
 
         item.innerHTML = `
