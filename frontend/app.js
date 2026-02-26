@@ -136,6 +136,10 @@ const closeMenuModalBtn = document.getElementById('close-menu-modal');
 const saveMenuBtn = document.getElementById('save-menu');
 const appContainer = document.getElementById('app');
 const roleSelect = document.getElementById('role-select');
+const roleManageActions = document.getElementById('role-manage-actions');
+const renameRoleBtn = document.getElementById('rename-role-btn');
+const deleteRoleBtn = document.getElementById('delete-role-btn');
+const addRoleBtn = document.getElementById('add-role-btn');
 const sugarAppLink = document.getElementById('sugar-app-link');
 function formatDate(date) {
     if (!date) return '';
@@ -224,6 +228,7 @@ async function init() {
 
     updateShortcutUI();
 
+    renderRoleSelect();
     if (savedRole && rolesData[savedRole]) {
         currentState.currentRole = savedRole;
         roleSelect.value = savedRole;
@@ -346,10 +351,19 @@ function switchRole(role) {
     guideData = rolesData[role].guides;
 
     // Default to first page of the role
-    const firstPageId = menuStructure[0].items[0].id;
+    const firstPageId = menuStructure[0]?.items[0]?.id || 'no-page';
+    if (!guideData[firstPageId] && firstPageId !== 'no-page') {
+        // Recover if page missing
+        guideData[firstPageId] = { title: '시작하기', content: '# 시작하기\n내용을 입력하세요.', toc: [] };
+    }
 
     renderMenu();
-    loadPage(firstPageId);
+    if (firstPageId !== 'no-page') {
+        loadPage(firstPageId);
+    } else {
+        docContentDisplay.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted);">페이지가 없습니다. 새 페이지를 추가해주세요.</div>';
+        breadcrumbCurrent.textContent = '-';
+    }
     persistAll();
 
     // Track role switch
@@ -359,6 +373,80 @@ function switchRole(role) {
             'role_name': rolesData[role].title
         });
     }
+}
+
+function renderRoleSelect() {
+    const currentVal = roleSelect.value || currentState.currentRole;
+    roleSelect.innerHTML = '';
+    Object.keys(rolesData).forEach(key => {
+        const option = document.createElement('option');
+        option.value = key;
+        option.textContent = rolesData[key].title;
+        roleSelect.appendChild(option);
+    });
+    if (rolesData[currentVal]) {
+        roleSelect.value = currentVal;
+    }
+}
+
+function addRole() {
+    const title = prompt('새 가이드 모음의 이름을 입력하세요 (예: 파트너 가이드):');
+    if (!title) return;
+
+    const id = 'role-' + Date.now();
+    const firstPageId = 'intro-' + Date.now();
+
+    rolesData[id] = {
+        title: title,
+        menu: [
+            {
+                category: '기본 가이드',
+                items: [{ id: firstPageId, title: '시작하기' }]
+            }
+        ],
+        guides: {
+            [firstPageId]: {
+                title: '시작하기',
+                content: `# ${title} 시작하기\n새로운 가이드를 작성해보세요.`,
+                toc: []
+            }
+        }
+    };
+
+    renderRoleSelect();
+    switchRole(id);
+    roleSelect.value = id;
+    persistAll();
+}
+
+function renameRole() {
+    const currentRole = currentState.currentRole;
+    const newTitle = prompt('가이드 모음의 이름을 수정하세요:', rolesData[currentRole].title);
+    if (!newTitle) return;
+
+    rolesData[currentRole].title = newTitle;
+    renderRoleSelect();
+    persistAll();
+}
+
+function deleteRole() {
+    const currentRole = currentState.currentRole;
+    const roleCount = Object.keys(rolesData).length;
+
+    if (roleCount <= 1) {
+        alert('최소 하나 이상의 가이드 모음이 필요합니다.');
+        return;
+    }
+
+    if (!confirm(`'${rolesData[currentRole].title}' 가이드 모음과 포함된 모든 페이지를 삭제하시겠습니까?`)) return;
+
+    delete rolesData[currentRole];
+
+    // Switch to first available
+    const nextRole = Object.keys(rolesData)[0];
+    renderRoleSelect();
+    switchRole(nextRole);
+    persistAll();
 }
 
 function renderMenu() {
@@ -975,11 +1063,15 @@ function updateEditControlsVisibility() {
         editControls.classList.add('active');
         sidebarControls.style.display = 'block';
         sidebarActions.style.display = 'flex';
+        roleManageActions.style.display = 'flex';
+        addRoleBtn.style.display = 'block';
         if (deployBtn) deployBtn.style.display = 'inline-block';
     } else {
         editControls.classList.remove('active');
         sidebarControls.style.display = 'none';
         sidebarActions.style.display = 'none';
+        roleManageActions.style.display = 'none';
+        addRoleBtn.style.display = 'none';
         if (deployBtn) deployBtn.style.display = 'none';
     }
     updateShortcutUI();
@@ -1119,6 +1211,11 @@ function setupEventListeners() {
     });
 
     editShortcutBtn.addEventListener('click', editShortcut);
+
+    // Role management
+    addRoleBtn.addEventListener('click', addRole);
+    renameRoleBtn.addEventListener('click', renameRole);
+    deleteRoleBtn.addEventListener('click', deleteRole);
 
     // Handle back/forward buttons
     window.addEventListener('hashchange', () => {

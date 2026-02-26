@@ -15,6 +15,24 @@
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
 }
 
+.edit-btn-small {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.8rem;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.edit-btn-small:hover {
+    background: var(--border-color);
+}
+
 body.dark-mode {
     --bg-main: #0f172a;
     --bg-sidebar: #1e293b;
