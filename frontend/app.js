@@ -141,6 +141,15 @@ const renameRoleBtn = document.getElementById('rename-role-btn');
 const deleteRoleBtn = document.getElementById('delete-role-btn');
 const addRoleBtn = document.getElementById('add-role-btn');
 const sugarAppLink = document.getElementById('sugar-app-link');
+
+function checkIsLocal() {
+    return window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1' ||
+        window.location.hostname === '::1' ||
+        window.location.hostname.startsWith('192.168.') ||
+        window.location.hostname.startsWith('172.') ||
+        window.location.hostname.startsWith('10.');
+}
 function formatDate(date) {
     if (!date) return '';
     const d = new Date(date);
@@ -260,7 +269,7 @@ async function init() {
 
         await Clerk.load();
 
-        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const isLocal = checkIsLocal();
         const localSession = isLocal ? JSON.parse(sessionStorage.getItem('local_test_user')) : null;
 
         if (Clerk.user || localSession) {
@@ -1063,15 +1072,20 @@ function updateEditControlsVisibility() {
         editControls.classList.add('active');
         sidebarControls.style.display = 'block';
         sidebarActions.style.display = 'flex';
-        roleManageActions.style.display = 'flex';
-        addRoleBtn.style.display = 'block';
+
+        // Use both CSS class and explicit JS display for maximum reliability
+        if (roleManageActions) roleManageActions.style.setProperty('display', 'flex', 'important');
+        if (addRoleBtn) addRoleBtn.style.setProperty('display', 'block', 'important');
+
         if (deployBtn) deployBtn.style.display = 'inline-block';
     } else {
         editControls.classList.remove('active');
         sidebarControls.style.display = 'none';
         sidebarActions.style.display = 'none';
-        roleManageActions.style.display = 'none';
-        addRoleBtn.style.display = 'none';
+
+        if (roleManageActions) roleManageActions.style.display = 'none';
+        if (addRoleBtn) addRoleBtn.style.display = 'none';
+
         if (deployBtn) deployBtn.style.display = 'none';
     }
     updateShortcutUI();
@@ -1231,7 +1245,7 @@ function updateAuthUI() {
     const userButtonDiv = document.getElementById('clerk-user-button');
 
     // Check if we have a Clerk user OR a local test session
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const isLocal = checkIsLocal();
     const localSession = isLocal ? JSON.parse(sessionStorage.getItem('local_test_user')) : null;
 
     if (Clerk.user || localSession) {
@@ -1261,6 +1275,7 @@ function updateAuthUI() {
         }
 
         currentState.isLoggedIn = true;
+        appContainer.classList.add('is-logged-in');
     } else {
         userButtonDiv.innerHTML = '';
 
@@ -1312,7 +1327,9 @@ function updateAuthUI() {
 
         currentState.isLoggedIn = false;
         currentState.currentUser = null;
+        appContainer.classList.remove('is-logged-in');
     }
+    updateEditControlsVisibility();
 }
 
 

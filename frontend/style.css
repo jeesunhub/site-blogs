@@ -15,22 +15,60 @@
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
 }
 
-.edit-btn-small {
-    background: none;
+.edit-btn-small,
+.cat-btn,
+.edit-title-btn {
+    background: #f59e0b;
+    /* Orange/Amber */
     border: none;
     cursor: pointer;
-    font-size: 0.8rem;
-    padding: 4px;
+    font-size: 0.75rem;
+    padding: 4px 6px;
     border-radius: 4px;
     transition: all 0.2s;
     line-height: 1;
     display: flex;
     align-items: center;
     justify-content: center;
+    color: white;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-.edit-btn-small:hover {
-    background: var(--border-color);
+.edit-btn-small:hover,
+.cat-btn:hover,
+.edit-title-btn:hover {
+    background: #d97706;
+    /* Darker amber */
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+/* Ensure delete buttons keep their identity but match the style */
+.cat-delete,
+.delete-item-btn,
+#delete-role-btn {
+    background: #ef4444 !important;
+}
+
+.cat-delete:hover,
+.delete-item-btn:hover,
+#delete-role-btn:hover {
+    background: #dc2626 !important;
+}
+
+#edit-btn {
+    background: #f59e0b;
+    color: white;
+    border: none;
+    padding: 0.6rem 1.25rem;
+    font-weight: 600;
+    box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);
+}
+
+#edit-btn:hover {
+    background: #d97706;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(217, 119, 6, 0.3);
 }
 
 body.dark-mode {
@@ -427,8 +465,21 @@ body {
     display: none;
 }
 
+#role-manage-actions,
+#add-role-btn {
+    display: none;
+}
+
 .is-logged-in .sidebar-actions {
     display: flex;
+}
+
+.is-logged-in #role-manage-actions {
+    display: flex !important;
+}
+
+.is-logged-in #add-role-btn {
+    display: block !important;
 }
 
 /* Content Area */
