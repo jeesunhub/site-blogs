@@ -450,7 +450,8 @@ body {
 .is-logged-in #add-divider-btn,
 .is-logged-in #edit-menu-btn,
 .is-logged-in #media-library-btn,
-.is-logged-in #add-role-btn {
+.is-logged-in #add-role-btn,
+.is-logged-in #add-subgroup-btn {
     border: 1.5px solid #f59e0b !important;
     /* Orange (Amber 500) */
     color: #d97706 !important;
@@ -463,9 +464,14 @@ body {
 .is-logged-in #add-divider-btn:hover,
 .is-logged-in #edit-menu-btn:hover,
 .is-logged-in #media-library-btn:hover,
-.is-logged-in #add-role-btn:hover {
+.is-logged-in #add-role-btn:hover,
+.is-logged-in #add-subgroup-btn:hover {
     background: rgba(245, 158, 11, 0.15) !important;
     border-color: #d97706 !important;
+}
+
+.is-logged-in #add-subgroup-btn {
+    display: block !important;
 }
 
 /* Content Area */
