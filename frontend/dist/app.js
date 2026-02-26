@@ -146,6 +146,12 @@ const subgroupManageActions = document.getElementById('subgroup-manage-actions')
 const renameSubgroupBtn = document.getElementById('rename-subgroup-btn');
 const deleteSubgroupBtn = document.getElementById('delete-subgroup-btn');
 const addSubgroupBtn = document.getElementById('add-subgroup-btn');
+const subcollectionSelectorContainer = document.getElementById('subcollection-selector-container');
+const subcollectionSelect = document.getElementById('subcollection-select');
+const subcollectionManageActions = document.getElementById('subcollection-manage-actions');
+const renameSubcollectionBtn = document.getElementById('rename-subcollection-btn');
+const deleteSubcollectionBtn = document.getElementById('delete-subcollection-btn');
+const addSubcollectionBtn = document.getElementById('add-subcollection-btn');
 const sugarAppLink = document.getElementById('sugar-app-link');
 function formatDate(date) {
     if (!date) return '';
@@ -170,9 +176,10 @@ let currentState = {
     currentUser: null,
     activePage: 'landlord-intro',
     currentRole: 'landlord',
-    activeSubgroup: null, // ID of the active subgroup
+    activeSubgroup: null,
+    activeSubcollection: null,
     isEditing: false,
-    sugarAppUrl: 'https://sugar-app.dev', // Default URL
+    sugarAppUrl: 'https://sugar-app.dev',
     theme: 'light'
 };
 
@@ -349,32 +356,33 @@ function switchRole(role) {
         subgroupSelectorContainer.style.display = 'block';
         renderSubgroupSelect();
         const lastSubId = localStorage.getItem(`sugar_last_sub_${role}`);
-        const subToLoad = roleData.subgroups.find(s => s.id === lastSubId) || roleData.subgroups[0];
-        currentState.activeSubgroup = subToLoad.id;
-        subgroupSelect.value = subToLoad.id;
-        menuStructure = subToLoad.menu;
+        const subToSelect = (lastSubId && roleData.subgroups.find(s => s.id === lastSubId)) ? lastSubId : roleData.subgroups[0].id;
+        subgroupSelect.value = subToSelect;
+        switchSubgroup(subToSelect);
     } else {
         subgroupSelectorContainer.style.display = 'none';
+        subcollectionSelectorContainer.style.display = 'none';
         currentState.activeSubgroup = null;
+        currentState.activeSubcollection = null;
         menuStructure = roleData.menu;
     }
 
     guideData = roleData.guides;
-
-    // Default to first page of the role
-    const firstPageId = menuStructure[0]?.items[0]?.id || 'no-page';
-    if (!guideData[firstPageId] && firstPageId !== 'no-page') {
-        // Recover if page missing
-        guideData[firstPageId] = { title: '시작하기', content: '# 시작하기\n내용을 입력하세요.', toc: [] };
+    if (!guideData) {
+        roleData.guides = {};
+        guideData = roleData.guides;
     }
 
     renderMenu();
+
+    const firstPageId = menuStructure[0]?.items[0]?.id || 'no-page';
     if (firstPageId !== 'no-page') {
         loadPage(firstPageId);
     } else {
         docContentDisplay.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted);">페이지가 없습니다. 새 페이지를 추가해주세요.</div>';
         breadcrumbCurrent.textContent = '-';
     }
+
     persistAll();
 
     // Track role switch
@@ -478,12 +486,66 @@ function switchSubgroup(subId) {
     if (!subgroup) return;
 
     currentState.activeSubgroup = subId;
-    menuStructure = subgroup.menu;
     localStorage.setItem(`sugar_last_sub_${role}`, subId);
 
-    // Update management actions visibility if logged in
     if (currentState.isLoggedIn) {
         subgroupManageActions.style.display = 'flex';
+        addSubcollectionBtn.style.display = 'block';
+    }
+
+    // Check for sub-collections (Level 3)
+    const hasSubcollections = subgroup.subcollections && subgroup.subcollections.length > 0;
+
+    if (hasSubcollections) {
+        subcollectionSelectorContainer.style.display = 'block';
+        renderSubcollectionSelect();
+        const lastSubColId = localStorage.getItem(`sugar_last_subcol_${subId}`);
+        const subColToSelect = (lastSubColId && subgroup.subcollections.find(s => s.id === lastSubColId)) ? lastSubColId : subgroup.subcollections[0].id;
+        subcollectionSelect.value = subColToSelect;
+        switchSubcollection(subColToSelect);
+    } else {
+        subcollectionSelectorContainer.style.display = 'none';
+        currentState.activeSubcollection = null;
+        menuStructure = subgroup.menu;
+
+        renderMenu();
+        const firstPageId = menuStructure[0]?.items[0]?.id || 'no-page';
+        if (firstPageId !== 'no-page') {
+            loadPage(firstPageId);
+        } else {
+            docContentDisplay.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted);">페이지가 없습니다. 새 페이지를 추가해주세요.</div>';
+        }
+    }
+}
+
+function renderSubcollectionSelect() {
+    const role = currentState.currentRole;
+    const subId = currentState.activeSubgroup;
+    const subgroup = rolesData[role].subgroups.find(s => s.id === subId);
+    if (!subgroup || !subgroup.subcollections) return;
+
+    subcollectionSelect.innerHTML = '';
+    subgroup.subcollections.forEach(sc => {
+        const option = document.createElement('option');
+        option.value = sc.id;
+        option.textContent = sc.title;
+        subcollectionSelect.appendChild(option);
+    });
+}
+
+function switchSubcollection(scId) {
+    const role = currentState.currentRole;
+    const subId = currentState.activeSubgroup;
+    const subgroup = rolesData[role].subgroups.find(s => s.id === subId);
+    const subcol = subgroup.subcollections.find(s => s.id === scId);
+    if (!subcol) return;
+
+    currentState.activeSubcollection = scId;
+    menuStructure = subcol.menu;
+    localStorage.setItem(`sugar_last_subcol_${subId}`, scId);
+
+    if (currentState.isLoggedIn) {
+        subcollectionManageActions.style.display = 'flex';
     }
 
     renderMenu();
@@ -492,8 +554,89 @@ function switchSubgroup(subId) {
         loadPage(firstPageId);
     } else {
         docContentDisplay.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted);">페이지가 없습니다. 새 페이지를 추가해주세요.</div>';
-        breadcrumbCurrent.textContent = '-';
     }
+}
+
+function addSubcollection() {
+    const role = currentState.currentRole;
+    const subId = currentState.activeSubgroup;
+    const subgroup = rolesData[role].subgroups.find(s => s.id === subId);
+
+    const title = prompt('새 서브 모음의 이름을 입력하세요:');
+    if (!title) return;
+
+    if (!subgroup.subcollections) {
+        // Migration
+        const currentMenu = JSON.parse(JSON.stringify(subgroup.menu));
+        subgroup.subcollections = [{
+            id: 'default-sc-' + Date.now(),
+            title: '기본 모음',
+            menu: currentMenu
+        }];
+        delete subgroup.menu;
+    }
+
+    const id = 'sc-' + Date.now();
+    const firstPageId = 'page-' + Date.now();
+
+    subgroup.subcollections.push({
+        id: id,
+        title: title,
+        menu: [{
+            category: '기본 가이드',
+            items: [{ id: firstPageId, title: '시작하기' }]
+        }]
+    });
+
+    rolesData[role].guides[firstPageId] = {
+        title: '시작하기',
+        content: `# ${title} 시작하기\n내용을 입력하세요.`,
+        toc: []
+    };
+
+    subcollectionSelectorContainer.style.display = 'block';
+    renderSubcollectionSelect();
+    switchSubcollection(id);
+    subcollectionSelect.value = id;
+    persistAll();
+}
+
+function renameSubcollection() {
+    const role = currentState.currentRole;
+    const subId = currentState.activeSubgroup;
+    const scId = currentState.activeSubcollection;
+    const subgroup = rolesData[role].subgroups.find(s => s.id === subId);
+    const subcol = subgroup.subcollections.find(s => s.id === scId);
+    if (!subcol) return;
+
+    const newTitle = prompt('서브 모음 이름을 수정하세요:', subcol.title);
+    if (!newTitle) return;
+
+    subcol.title = newTitle;
+    renderSubcollectionSelect();
+    subcollectionSelect.value = scId;
+    persistAll();
+}
+
+function deleteSubcollection() {
+    const role = currentState.currentRole;
+    const subId = currentState.activeSubgroup;
+    const scId = currentState.activeSubcollection;
+    const subgroup = rolesData[role].subgroups.find(s => s.id === subId);
+    const subcollections = subgroup.subcollections;
+
+    if (!subcollections || subcollections.length <= 1) {
+        alert('최소 하나 이상의 서브 모음이 필요합니다.');
+        return;
+    }
+
+    if (!confirm(`'${subcollections.find(s => s.id === scId).title}' 서브 모음을 삭제하시겠습니까?`)) return;
+
+    subgroup.subcollections = subcollections.filter(sc => sc.id !== scId);
+
+    renderSubcollectionSelect();
+    switchSubcollection(subgroup.subcollections[0].id);
+    persistAll();
 }
 
 function addSubgroup() {
@@ -575,6 +718,11 @@ function renderMenu() {
         appContainer.classList.add('is-logged-in');
     } else {
         appContainer.classList.remove('is-logged-in');
+    }
+
+    if (!menuStructure) {
+        console.error('[renderMenu] menuStructure is undefined or null');
+        return;
     }
 
     menuStructure.forEach((cat, catIndex) => {
@@ -1088,7 +1236,19 @@ function loadPage(pageId) {
     }
 
     // Render Markdown to HTML
-    const htmlContent = marked.parse(data.content.trim());
+    let htmlContent = marked.parse(data.content.trim());
+
+    // Fix legacy/broken image URLs and relative paths
+    if (API_BASE_URL && !API_BASE_URL.startsWith('__')) {
+        // Fix old domain if applicable
+        const legacyOrigin = 'https://site-blogs.iamjeesun.workers.dev';
+        htmlContent = htmlContent.replace(new RegExp(legacyOrigin + '/media/', 'g'), `${API_BASE_URL}/media/`);
+
+        // Fix relative paths
+        htmlContent = htmlContent.replace(/src="\/media\//g, `src="${API_BASE_URL}/media/`);
+        htmlContent = htmlContent.replace(/\(\/media\//g, `(${API_BASE_URL}/media/`);
+    }
+
     docContentDisplay.innerHTML = htmlContent;
     applyMediaDimensions(docContentDisplay);
     breadcrumbCurrent.textContent = data.title;
@@ -1188,6 +1348,8 @@ function updateEditControlsVisibility() {
         if (addRoleBtn) addRoleBtn.style.setProperty('display', 'block', 'important');
         if (subgroupManageActions) subgroupManageActions.style.setProperty('display', 'flex', 'important');
         if (addSubgroupBtn) addSubgroupBtn.style.setProperty('display', 'block', 'important');
+        if (subcollectionManageActions) subcollectionManageActions.style.setProperty('display', 'flex', 'important');
+        if (addSubcollectionBtn) addSubcollectionBtn.style.setProperty('display', 'block', 'important');
 
         if (deployBtn) deployBtn.style.display = 'inline-block';
     } else {
@@ -1199,6 +1361,8 @@ function updateEditControlsVisibility() {
         if (addRoleBtn) addRoleBtn.style.display = 'none';
         if (subgroupManageActions) subgroupManageActions.style.display = 'none';
         if (addSubgroupBtn) addSubgroupBtn.style.display = 'none';
+        if (subcollectionManageActions) subcollectionManageActions.style.display = 'none';
+        if (addSubcollectionBtn) addSubcollectionBtn.style.display = 'none';
 
         if (deployBtn) deployBtn.style.display = 'none';
     }
@@ -1262,12 +1426,21 @@ function applyMediaDimensions(container) {
     if (!container) return;
     const images = container.querySelectorAll('img');
     images.forEach(img => {
+        const src = img.getAttribute('src');
+        if (!src) return;
+
         // Try to find matching asset in mediaAssets
-        const asset = mediaAssets.find(a => a.url === img.getAttribute('src'));
+        let asset = mediaAssets.find(a => a.url === src);
+
+        // If no exact match, try matching by filename/key (resilience against domain changes)
+        if (!asset && src.includes('/media/')) {
+            const key = src.split('/media/').pop();
+            asset = mediaAssets.find(a => a.url && a.url.endsWith('/' + key));
+        }
+
         if (asset && asset.width && asset.height) {
             img.style.width = asset.width + 'px';
-            img.style.height = 'auto'; // Keep aspect ratio if only width is critical, but user specified both
-            // If user wants exact resolution:
+            img.style.height = 'auto';
             img.width = asset.width;
             img.height = asset.height;
             img.style.maxWidth = '100%';
@@ -1342,6 +1515,10 @@ function setupEventListeners() {
         switchSubgroup(e.target.value);
     });
 
+    subcollectionSelect.addEventListener('change', (e) => {
+        switchSubcollection(e.target.value);
+    });
+
     editShortcutBtn.addEventListener('click', editShortcut);
 
     // Role management
@@ -1353,6 +1530,11 @@ function setupEventListeners() {
     addSubgroupBtn.addEventListener('click', addSubgroup);
     renameSubgroupBtn.addEventListener('click', renameSubgroup);
     deleteSubgroupBtn.addEventListener('click', deleteSubgroup);
+
+    // Subcollection management
+    addSubcollectionBtn.addEventListener('click', addSubcollection);
+    renameSubcollectionBtn.addEventListener('click', renameSubcollection);
+    deleteSubcollectionBtn.addEventListener('click', deleteSubcollection);
 
     // Handle back/forward buttons
     window.addEventListener('hashchange', () => {
