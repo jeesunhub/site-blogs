@@ -136,6 +136,16 @@ const closeMenuModalBtn = document.getElementById('close-menu-modal');
 const saveMenuBtn = document.getElementById('save-menu');
 const appContainer = document.getElementById('app');
 const roleSelect = document.getElementById('role-select');
+const roleManageActions = document.getElementById('role-manage-actions');
+const renameRoleBtn = document.getElementById('rename-role-btn');
+const deleteRoleBtn = document.getElementById('delete-role-btn');
+const addRoleBtn = document.getElementById('add-role-btn');
+const subgroupSelectorContainer = document.getElementById('subgroup-selector-container');
+const subgroupSelect = document.getElementById('subgroup-select');
+const subgroupManageActions = document.getElementById('subgroup-manage-actions');
+const renameSubgroupBtn = document.getElementById('rename-subgroup-btn');
+const deleteSubgroupBtn = document.getElementById('delete-subgroup-btn');
+const addSubgroupBtn = document.getElementById('add-subgroup-btn');
 const sugarAppLink = document.getElementById('sugar-app-link');
 function formatDate(date) {
     if (!date) return '';
@@ -160,6 +170,7 @@ let currentState = {
     currentUser: null,
     activePage: 'landlord-intro',
     currentRole: 'landlord',
+    activeSubgroup: null, // ID of the active subgroup
     isEditing: false,
     sugarAppUrl: 'https://sugar-app.dev', // Default URL
     theme: 'light'
@@ -224,21 +235,9 @@ async function init() {
 
     updateShortcutUI();
 
-    if (savedRole && rolesData[savedRole]) {
-        currentState.currentRole = savedRole;
-        roleSelect.value = savedRole;
-    }
-
-    menuStructure = rolesData[currentState.currentRole].menu;
-    guideData = rolesData[currentState.currentRole].guides;
-
-    // Check URL hash for direct landing
-    const hash = window.location.hash.replace('#', '');
-    if (hash && guideData[hash]) {
-        currentState.activePage = hash;
-    } else {
-        currentState.activePage = menuStructure[0].items[0].id;
-    }
+    renderRoleSelect();
+    const initialRole = (savedRole && rolesData[savedRole]) ? savedRole : currentState.currentRole;
+    switchRole(initialRole);
 
     // 3. Clerk Initialization
     try {
@@ -342,14 +341,40 @@ function switchRole(role) {
     if (!rolesData[role]) return;
 
     currentState.currentRole = role;
-    menuStructure = rolesData[role].menu;
-    guideData = rolesData[role].guides;
+
+    const roleData = rolesData[role];
+    const hasSubgroups = roleData.subgroups && roleData.subgroups.length > 0;
+
+    if (hasSubgroups) {
+        subgroupSelectorContainer.style.display = 'block';
+        renderSubgroupSelect();
+        const lastSubId = localStorage.getItem(`sugar_last_sub_${role}`);
+        const subToLoad = roleData.subgroups.find(s => s.id === lastSubId) || roleData.subgroups[0];
+        currentState.activeSubgroup = subToLoad.id;
+        subgroupSelect.value = subToLoad.id;
+        menuStructure = subToLoad.menu;
+    } else {
+        subgroupSelectorContainer.style.display = 'none';
+        currentState.activeSubgroup = null;
+        menuStructure = roleData.menu;
+    }
+
+    guideData = roleData.guides;
 
     // Default to first page of the role
-    const firstPageId = menuStructure[0].items[0].id;
+    const firstPageId = menuStructure[0]?.items[0]?.id || 'no-page';
+    if (!guideData[firstPageId] && firstPageId !== 'no-page') {
+        // Recover if page missing
+        guideData[firstPageId] = { title: '시작하기', content: '# 시작하기\n내용을 입력하세요.', toc: [] };
+    }
 
     renderMenu();
-    loadPage(firstPageId);
+    if (firstPageId !== 'no-page') {
+        loadPage(firstPageId);
+    } else {
+        docContentDisplay.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted);">페이지가 없습니다. 새 페이지를 추가해주세요.</div>';
+        breadcrumbCurrent.textContent = '-';
+    }
     persistAll();
 
     // Track role switch
@@ -359,6 +384,188 @@ function switchRole(role) {
             'role_name': rolesData[role].title
         });
     }
+}
+
+function renderRoleSelect() {
+    const currentVal = roleSelect.value || currentState.currentRole;
+    roleSelect.innerHTML = '';
+    Object.keys(rolesData).forEach(key => {
+        const option = document.createElement('option');
+        option.value = key;
+        option.textContent = rolesData[key].title;
+        roleSelect.appendChild(option);
+    });
+    if (rolesData[currentVal]) {
+        roleSelect.value = currentVal;
+    }
+}
+
+function addRole() {
+    const title = prompt('새 가이드 모음의 이름을 입력하세요 (예: 파트너 가이드):');
+    if (!title) return;
+
+    const id = 'role-' + Date.now();
+    const firstPageId = 'intro-' + Date.now();
+
+    rolesData[id] = {
+        title: title,
+        menu: [
+            {
+                category: '기본 가이드',
+                items: [{ id: firstPageId, title: '시작하기' }]
+            }
+        ],
+        guides: {
+            [firstPageId]: {
+                title: '시작하기',
+                content: `# ${title} 시작하기\n새로운 가이드를 작성해보세요.`,
+                toc: []
+            }
+        }
+    };
+
+    renderRoleSelect();
+    switchRole(id);
+    roleSelect.value = id;
+    persistAll();
+}
+
+function renameRole() {
+    const currentRole = currentState.currentRole;
+    const newTitle = prompt('가이드 모음의 이름을 수정하세요:', rolesData[currentRole].title);
+    if (!newTitle) return;
+
+    rolesData[currentRole].title = newTitle;
+    renderRoleSelect();
+    persistAll();
+}
+
+function deleteRole() {
+    const currentRole = currentState.currentRole;
+    const roleCount = Object.keys(rolesData).length;
+
+    if (roleCount <= 1) {
+        alert('최소 하나 이상의 가이드 모음이 필요합니다.');
+        return;
+    }
+
+    if (!confirm(`'${rolesData[currentRole].title}' 가이드 모음과 포함된 모든 페이지를 삭제하시겠습니까?`)) return;
+
+    delete rolesData[currentRole];
+
+    const nextRole = Object.keys(rolesData)[0];
+    renderRoleSelect();
+    switchRole(nextRole);
+    persistAll();
+}
+
+function renderSubgroupSelect() {
+    const role = currentState.currentRole;
+    if (!rolesData[role].subgroups) return;
+
+    subgroupSelect.innerHTML = '';
+    rolesData[role].subgroups.forEach(sub => {
+        const option = document.createElement('option');
+        option.value = sub.id;
+        option.textContent = sub.title;
+        subgroupSelect.appendChild(option);
+    });
+}
+
+function switchSubgroup(subId) {
+    const role = currentState.currentRole;
+    const subgroup = rolesData[role].subgroups.find(s => s.id === subId);
+    if (!subgroup) return;
+
+    currentState.activeSubgroup = subId;
+    menuStructure = subgroup.menu;
+    localStorage.setItem(`sugar_last_sub_${role}`, subId);
+
+    // Update management actions visibility if logged in
+    if (currentState.isLoggedIn) {
+        subgroupManageActions.style.display = 'flex';
+    }
+
+    renderMenu();
+    const firstPageId = menuStructure[0]?.items[0]?.id || 'no-page';
+    if (firstPageId !== 'no-page') {
+        loadPage(firstPageId);
+    } else {
+        docContentDisplay.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted);">페이지가 없습니다. 새 페이지를 추가해주세요.</div>';
+        breadcrumbCurrent.textContent = '-';
+    }
+}
+
+function addSubgroup() {
+    const role = currentState.currentRole;
+    const title = prompt('새 서브 메뉴의 이름을 입력하세요 (예: 아파트, 빌라):');
+    if (!title) return;
+
+    if (!rolesData[role].subgroups) {
+        const currentMenu = JSON.parse(JSON.stringify(rolesData[role].menu));
+        rolesData[role].subgroups = [{
+            id: 'default-' + Date.now(),
+            title: '기본 메뉴',
+            menu: currentMenu
+        }];
+    }
+
+    const id = 'sub-' + Date.now();
+    const firstPageId = 'page-' + Date.now();
+
+    rolesData[role].subgroups.push({
+        id: id,
+        title: title,
+        menu: [{
+            category: '기본 가이드',
+            items: [{ id: firstPageId, title: '시작하기' }]
+        }]
+    });
+
+    rolesData[role].guides[firstPageId] = {
+        title: '시작하기',
+        content: `# ${title} 시작하기\n내용을 입력하세요.`,
+        toc: []
+    };
+
+    subgroupSelectorContainer.style.display = 'block';
+    renderSubgroupSelect();
+    switchSubgroup(id);
+    subgroupSelect.value = id;
+    persistAll();
+}
+
+function renameSubgroup() {
+    const role = currentState.currentRole;
+    const subId = currentState.activeSubgroup;
+    const subgroup = rolesData[role].subgroups.find(s => s.id === subId);
+    if (!subgroup) return;
+
+    const newTitle = prompt('서브 메뉴 이름을 수정하세요:', subgroup.title);
+    if (!newTitle) return;
+
+    subgroup.title = newTitle;
+    renderSubgroupSelect();
+    subgroupSelect.value = subId;
+    persistAll();
+}
+
+function deleteSubgroup() {
+    const role = currentState.currentRole;
+    const subId = currentState.activeSubgroup;
+    const subgroups = rolesData[role].subgroups;
+    if (!subgroups || subgroups.length <= 1) {
+        alert('최소 하나 이상의 서브 메뉴가 필요합니다.');
+        return;
+    }
+
+    if (!confirm(`'${subgroups.find(s => s.id === subId).title}' 서브 메뉴를 삭제하시겠습니까?`)) return;
+
+    rolesData[role].subgroups = subgroups.filter(s => s.id !== subId);
+
+    renderSubgroupSelect();
+    switchSubgroup(rolesData[role].subgroups[0].id);
+    persistAll();
 }
 
 function renderMenu() {
@@ -975,11 +1182,24 @@ function updateEditControlsVisibility() {
         editControls.classList.add('active');
         sidebarControls.style.display = 'block';
         sidebarActions.style.display = 'flex';
+
+        // Use both CSS class and explicit JS display for maximum reliability
+        if (roleManageActions) roleManageActions.style.setProperty('display', 'flex', 'important');
+        if (addRoleBtn) addRoleBtn.style.setProperty('display', 'block', 'important');
+        if (subgroupManageActions) subgroupManageActions.style.setProperty('display', 'flex', 'important');
+        if (addSubgroupBtn) addSubgroupBtn.style.setProperty('display', 'block', 'important');
+
         if (deployBtn) deployBtn.style.display = 'inline-block';
     } else {
         editControls.classList.remove('active');
         sidebarControls.style.display = 'none';
         sidebarActions.style.display = 'none';
+
+        if (roleManageActions) roleManageActions.style.display = 'none';
+        if (addRoleBtn) addRoleBtn.style.display = 'none';
+        if (subgroupManageActions) subgroupManageActions.style.display = 'none';
+        if (addSubgroupBtn) addSubgroupBtn.style.display = 'none';
+
         if (deployBtn) deployBtn.style.display = 'none';
     }
     updateShortcutUI();
@@ -1118,7 +1338,21 @@ function setupEventListeners() {
         switchRole(e.target.value);
     });
 
+    subgroupSelect.addEventListener('change', (e) => {
+        switchSubgroup(e.target.value);
+    });
+
     editShortcutBtn.addEventListener('click', editShortcut);
+
+    // Role management
+    addRoleBtn.addEventListener('click', addRole);
+    renameRoleBtn.addEventListener('click', renameRole);
+    deleteRoleBtn.addEventListener('click', deleteRole);
+
+    // Subgroup management
+    addSubgroupBtn.addEventListener('click', addSubgroup);
+    renameSubgroupBtn.addEventListener('click', renameSubgroup);
+    deleteSubgroupBtn.addEventListener('click', deleteSubgroup);
 
     // Handle back/forward buttons
     window.addEventListener('hashchange', () => {
@@ -1134,7 +1368,12 @@ function updateAuthUI() {
     const userButtonDiv = document.getElementById('clerk-user-button');
 
     // Check if we have a Clerk user OR a local test session
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const isLocal = window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1' ||
+        window.location.hostname === '::1' ||
+        window.location.hostname.startsWith('192.168.') ||
+        window.location.hostname.startsWith('172.') ||
+        window.location.hostname.startsWith('10.');
     const localSession = isLocal ? JSON.parse(sessionStorage.getItem('local_test_user')) : null;
 
     if (Clerk.user || localSession) {
@@ -1164,6 +1403,7 @@ function updateAuthUI() {
         }
 
         currentState.isLoggedIn = true;
+        appContainer.classList.add('is-logged-in');
     } else {
         userButtonDiv.innerHTML = '';
 
@@ -1215,7 +1455,9 @@ function updateAuthUI() {
 
         currentState.isLoggedIn = false;
         currentState.currentUser = null;
+        appContainer.classList.remove('is-logged-in');
     }
+    updateEditControlsVisibility();
 }
 
 

@@ -1088,7 +1088,19 @@ function loadPage(pageId) {
     }
 
     // Render Markdown to HTML
-    const htmlContent = marked.parse(data.content.trim());
+    let htmlContent = marked.parse(data.content.trim());
+
+    // Fix legacy/broken image URLs and relative paths
+    if (API_BASE_URL && !API_BASE_URL.startsWith('__')) {
+        // Fix old domain if applicable
+        const legacyOrigin = 'https://site-blogs.iamjeesun.workers.dev';
+        htmlContent = htmlContent.replace(new RegExp(legacyOrigin + '/media/', 'g'), `${API_BASE_URL}/media/`);
+
+        // Fix relative paths
+        htmlContent = htmlContent.replace(/src="\/media\//g, `src="${API_BASE_URL}/media/`);
+        htmlContent = htmlContent.replace(/\(\/media\//g, `(${API_BASE_URL}/media/`);
+    }
+
     docContentDisplay.innerHTML = htmlContent;
     applyMediaDimensions(docContentDisplay);
     breadcrumbCurrent.textContent = data.title;
@@ -1262,12 +1274,21 @@ function applyMediaDimensions(container) {
     if (!container) return;
     const images = container.querySelectorAll('img');
     images.forEach(img => {
+        const src = img.getAttribute('src');
+        if (!src) return;
+
         // Try to find matching asset in mediaAssets
-        const asset = mediaAssets.find(a => a.url === img.getAttribute('src'));
+        let asset = mediaAssets.find(a => a.url === src);
+
+        // If no exact match, try matching by filename/key (resilience against domain changes)
+        if (!asset && src.includes('/media/')) {
+            const key = src.split('/media/').pop();
+            asset = mediaAssets.find(a => a.url && a.url.endsWith('/' + key));
+        }
+
         if (asset && asset.width && asset.height) {
             img.style.width = asset.width + 'px';
-            img.style.height = 'auto'; // Keep aspect ratio if only width is critical, but user specified both
-            // If user wants exact resolution:
+            img.style.height = 'auto';
             img.width = asset.width;
             img.height = asset.height;
             img.style.maxWidth = '100%';
