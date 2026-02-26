@@ -141,15 +141,6 @@ const renameRoleBtn = document.getElementById('rename-role-btn');
 const deleteRoleBtn = document.getElementById('delete-role-btn');
 const addRoleBtn = document.getElementById('add-role-btn');
 const sugarAppLink = document.getElementById('sugar-app-link');
-
-function checkIsLocal() {
-    return window.location.hostname === 'localhost' ||
-        window.location.hostname === '127.0.0.1' ||
-        window.location.hostname === '::1' ||
-        window.location.hostname.startsWith('192.168.') ||
-        window.location.hostname.startsWith('172.') ||
-        window.location.hostname.startsWith('10.');
-}
 function formatDate(date) {
     if (!date) return '';
     const d = new Date(date);
@@ -269,7 +260,7 @@ async function init() {
 
         await Clerk.load();
 
-        const isLocal = checkIsLocal();
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         const localSession = isLocal ? JSON.parse(sessionStorage.getItem('local_test_user')) : null;
 
         if (Clerk.user || localSession) {
@@ -1245,7 +1236,12 @@ function updateAuthUI() {
     const userButtonDiv = document.getElementById('clerk-user-button');
 
     // Check if we have a Clerk user OR a local test session
-    const isLocal = checkIsLocal();
+    const isLocal = window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1' ||
+        window.location.hostname === '::1' ||
+        window.location.hostname.startsWith('192.168.') ||
+        window.location.hostname.startsWith('172.') ||
+        window.location.hostname.startsWith('10.');
     const localSession = isLocal ? JSON.parse(sessionStorage.getItem('local_test_user')) : null;
 
     if (Clerk.user || localSession) {

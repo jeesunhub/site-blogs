@@ -15,60 +15,22 @@
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
 }
 
-.edit-btn-small,
-.cat-btn,
-.edit-title-btn {
-    background: #f59e0b;
-    /* Orange/Amber */
+.edit-btn-small {
+    background: none;
     border: none;
     cursor: pointer;
-    font-size: 0.75rem;
-    padding: 4px 6px;
+    font-size: 0.8rem;
+    padding: 4px;
     border-radius: 4px;
     transition: all 0.2s;
     line-height: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-.edit-btn-small:hover,
-.cat-btn:hover,
-.edit-title-btn:hover {
-    background: #d97706;
-    /* Darker amber */
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
-}
-
-/* Ensure delete buttons keep their identity but match the style */
-.cat-delete,
-.delete-item-btn,
-#delete-role-btn {
-    background: #ef4444 !important;
-}
-
-.cat-delete:hover,
-.delete-item-btn:hover,
-#delete-role-btn:hover {
-    background: #dc2626 !important;
-}
-
-#edit-btn {
-    background: #f59e0b;
-    color: white;
-    border: none;
-    padding: 0.6rem 1.25rem;
-    font-weight: 600;
-    box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);
-}
-
-#edit-btn:hover {
-    background: #d97706;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 6px rgba(217, 119, 6, 0.3);
+.edit-btn-small:hover {
+    background: var(--border-color);
 }
 
 body.dark-mode {
@@ -480,6 +442,30 @@ body {
 
 .is-logged-in #add-role-btn {
     display: block !important;
+}
+
+/* Admin Action Buttons - Orange Border Theme */
+.is-logged-in #add-page-btn,
+.is-logged-in #add-cat-btn,
+.is-logged-in #add-divider-btn,
+.is-logged-in #edit-menu-btn,
+.is-logged-in #media-library-btn,
+.is-logged-in #add-role-btn {
+    border: 1.5px solid #f59e0b !important;
+    /* Orange (Amber 500) */
+    color: #d97706 !important;
+    /* Darker Orange for text */
+    background: rgba(245, 158, 11, 0.05) !important;
+}
+
+.is-logged-in #add-page-btn:hover,
+.is-logged-in #add-cat-btn:hover,
+.is-logged-in #add-divider-btn:hover,
+.is-logged-in #edit-menu-btn:hover,
+.is-logged-in #media-library-btn:hover,
+.is-logged-in #add-role-btn:hover {
+    background: rgba(245, 158, 11, 0.15) !important;
+    border-color: #d97706 !important;
 }
 
 /* Content Area */
