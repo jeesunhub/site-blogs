@@ -152,6 +152,12 @@ const subcollectionManageActions = document.getElementById('subcollection-manage
 const renameSubcollectionBtn = document.getElementById('rename-subcollection-btn');
 const deleteSubcollectionBtn = document.getElementById('delete-subcollection-btn');
 const addSubcollectionBtn = document.getElementById('add-subcollection-btn');
+const moveRoleUpBtn = document.getElementById('move-role-up-btn');
+const moveRoleDownBtn = document.getElementById('move-role-down-btn');
+const moveSubgroupUpBtn = document.getElementById('move-subgroup-up-btn');
+const moveSubgroupDownBtn = document.getElementById('move-subgroup-down-btn');
+const moveSubcollectionUpBtn = document.getElementById('move-subcollection-up-btn');
+const moveSubcollectionDownBtn = document.getElementById('move-subcollection-down-btn');
 const sugarAppLink = document.getElementById('sugar-app-link');
 function formatDate(date) {
     if (!date) return '';
@@ -467,6 +473,25 @@ function deleteRole() {
     persistAll();
 }
 
+function moveRole(direction) {
+    const keys = Object.keys(rolesData);
+    const index = keys.indexOf(currentState.currentRole);
+    if (index === -1) return;
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= keys.length) return;
+
+    // Swap keys in rolesData (objects maintain insertion order for string keys in JS)
+    const newKeys = [...keys];
+    [newKeys[index], newKeys[targetIndex]] = [newKeys[targetIndex], newKeys[index]];
+
+    const newRolesData = {};
+    newKeys.forEach(k => newRolesData[k] = rolesData[k]);
+    rolesData = newRolesData;
+
+    renderRoleSelect();
+    persistAll();
+}
+
 function renderSubgroupSelect() {
     const role = currentState.currentRole;
     if (!rolesData[role].subgroups) return;
@@ -639,6 +664,24 @@ function deleteSubcollection() {
     persistAll();
 }
 
+function moveSubcollection(direction) {
+    const role = currentState.currentRole;
+    const subId = currentState.activeSubgroup;
+    const subgroup = rolesData[role].subgroups.find(s => s.id === subId);
+    const subcollections = subgroup.subcollections;
+    if (!subcollections) return;
+    const index = subcollections.findIndex(sc => sc.id === currentState.activeSubcollection);
+    if (index === -1) return;
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= subcollections.length) return;
+
+    [subcollections[index], subcollections[targetIndex]] = [subcollections[targetIndex], subcollections[index]];
+
+    renderSubcollectionSelect();
+    subcollectionSelect.value = currentState.activeSubcollection;
+    persistAll();
+}
+
 function addSubgroup() {
     const role = currentState.currentRole;
     const title = prompt('새 서브 메뉴의 이름을 입력하세요 (예: 아파트, 빌라):');
@@ -708,6 +751,22 @@ function deleteSubgroup() {
 
     renderSubgroupSelect();
     switchSubgroup(rolesData[role].subgroups[0].id);
+    persistAll();
+}
+
+function moveSubgroup(direction) {
+    const role = currentState.currentRole;
+    const subgroups = rolesData[role].subgroups;
+    if (!subgroups) return;
+    const index = subgroups.findIndex(s => s.id === currentState.activeSubgroup);
+    if (index === -1) return;
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= subgroups.length) return;
+
+    [subgroups[index], subgroups[targetIndex]] = [subgroups[targetIndex], subgroups[index]];
+
+    renderSubgroupSelect();
+    subgroupSelect.value = currentState.activeSubgroup;
     persistAll();
 }
 
@@ -1535,6 +1594,14 @@ function setupEventListeners() {
     addSubcollectionBtn.addEventListener('click', addSubcollection);
     renameSubcollectionBtn.addEventListener('click', renameSubcollection);
     deleteSubcollectionBtn.addEventListener('click', deleteSubcollection);
+
+    // Order management
+    moveRoleUpBtn.addEventListener('click', () => moveRole(-1));
+    moveRoleDownBtn.addEventListener('click', () => moveRole(1));
+    moveSubgroupUpBtn.addEventListener('click', () => moveSubgroup(-1));
+    moveSubgroupDownBtn.addEventListener('click', () => moveSubgroup(1));
+    moveSubcollectionUpBtn.addEventListener('click', () => moveSubcollection(-1));
+    moveSubcollectionDownBtn.addEventListener('click', () => moveSubcollection(1));
 
     // Handle back/forward buttons
     window.addEventListener('hashchange', () => {
