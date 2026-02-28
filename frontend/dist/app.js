@@ -114,6 +114,7 @@ const editorPreview = document.getElementById('editor-preview');
 const previewToggleBtn = document.getElementById('preview-toggle');
 const cancelEditBtn = document.getElementById('cancel-edit');
 const saveContentBtn = document.getElementById('save-content');
+const tempSaveContentBtn = document.getElementById('temp-save-content');
 const contentWrapper = document.getElementById('content-wrapper');
 
 const sidebarControls = document.getElementById('sidebar-controls');
@@ -152,6 +153,12 @@ const subcollectionManageActions = document.getElementById('subcollection-manage
 const renameSubcollectionBtn = document.getElementById('rename-subcollection-btn');
 const deleteSubcollectionBtn = document.getElementById('delete-subcollection-btn');
 const addSubcollectionBtn = document.getElementById('add-subcollection-btn');
+const moveRoleUpBtn = document.getElementById('move-role-up-btn');
+const moveRoleDownBtn = document.getElementById('move-role-down-btn');
+const moveSubgroupUpBtn = document.getElementById('move-subgroup-up-btn');
+const moveSubgroupDownBtn = document.getElementById('move-subgroup-down-btn');
+const moveSubcollectionUpBtn = document.getElementById('move-subcollection-up-btn');
+const moveSubcollectionDownBtn = document.getElementById('move-subcollection-down-btn');
 const sugarAppLink = document.getElementById('sugar-app-link');
 function formatDate(date) {
     if (!date) return '';
@@ -242,9 +249,12 @@ async function init() {
 
     updateShortcutUI();
 
+    const hash = window.location.hash.replace('#', '');
+    const path = findPathByPageId(hash);
+    const initialRole = (path && path.role) ? path.role : ((savedRole && rolesData[savedRole]) ? savedRole : currentState.currentRole);
+
     renderRoleSelect();
-    const initialRole = (savedRole && rolesData[savedRole]) ? savedRole : currentState.currentRole;
-    switchRole(initialRole);
+    switchRole(initialRole, hash);
 
     // 3. Clerk Initialization
     try {
@@ -287,7 +297,7 @@ async function init() {
 
     renderMenu();
     updateEditControlsVisibility();
-    loadPage(currentState.activePage);
+    // No longer calling loadPage here, as switchRole handles it via targetPageId
     setupEventListeners();
 }
 
@@ -306,7 +316,7 @@ async function persistAll() {
     }
 }
 
-async function publishSiteData() {
+async function publishSiteData(silent = false) {
     if (!currentState.isLoggedIn) return;
 
     deployBtn.disabled = true;
@@ -326,7 +336,7 @@ async function publishSiteData() {
         });
 
         if (response.ok) {
-            alert('성공적으로 배포되었습니다! 이제 모든 사용자가 변경 사항을 볼 수 있습니다.');
+            if (!silent) alert('성공적으로 배포되었습니다! 이제 모든 사용자가 변경 사항을 볼 수 있습니다.');
             deployBtn.style.background = 'var(--primary)';
             deployBtn.textContent = '🚀 배포 완료';
             setTimeout(() => {
@@ -337,17 +347,48 @@ async function publishSiteData() {
         }
     } catch (err) {
         console.error('Server sync failed:', err);
-        alert('배포 중 오류가 발생했습니다: ' + err.message);
+        if (!silent) alert('배포 중 오류가 발생했습니다: ' + err.message);
         deployBtn.textContent = '🚀 배포 실패 (재시도)';
     } finally {
         deployBtn.disabled = false;
     }
 }
 
-function switchRole(role) {
+function findPathByPageId(pageId) {
+    if (!pageId) return null;
+    for (const [roleKey, roleData] of Object.entries(rolesData)) {
+        if (roleData.menu) {
+            for (const cat of roleData.menu) {
+                if (cat.items && cat.items.some(i => i.id === pageId)) return { role: roleKey };
+            }
+        }
+        if (roleData.subgroups) {
+            for (const sub of roleData.subgroups) {
+                if (sub.menu) {
+                    for (const cat of sub.menu) {
+                        if (cat.items && cat.items.some(i => i.id === pageId)) return { role: roleKey, subgroup: sub.id };
+                    }
+                }
+                if (sub.subcollections) {
+                    for (const sc of sub.subcollections) {
+                        if (sc.menu) {
+                            for (const cat of sc.menu) {
+                                if (cat.items && cat.items.some(i => i.id === pageId)) return { role: roleKey, subgroup: sub.id, subcollection: sc.id };
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return null;
+}
+
+function switchRole(role, targetPageId = null) {
     if (!rolesData[role]) return;
 
     currentState.currentRole = role;
+    if (roleSelect) roleSelect.value = role;
 
     const roleData = rolesData[role];
     const hasSubgroups = roleData.subgroups && roleData.subgroups.length > 0;
@@ -356,36 +397,44 @@ function switchRole(role) {
         subgroupSelectorContainer.style.display = 'block';
         renderSubgroupSelect();
         const lastSubId = localStorage.getItem(`sugar_last_sub_${role}`);
-        const subToSelect = (lastSubId && roleData.subgroups.find(s => s.id === lastSubId)) ? lastSubId : roleData.subgroups[0].id;
+
+        let subToSelect;
+        const path = findPathByPageId(targetPageId);
+        if (path && path.role === role && path.subgroup) {
+            subToSelect = path.subgroup;
+        } else {
+            subToSelect = (lastSubId && roleData.subgroups.find(s => s.id === lastSubId)) ? lastSubId : roleData.subgroups[0].id;
+        }
+
         subgroupSelect.value = subToSelect;
-        switchSubgroup(subToSelect);
+        switchSubgroup(subToSelect, targetPageId);
     } else {
         subgroupSelectorContainer.style.display = 'none';
         subcollectionSelectorContainer.style.display = 'none';
         currentState.activeSubgroup = null;
         currentState.activeSubcollection = null;
         menuStructure = roleData.menu;
-    }
 
-    guideData = roleData.guides;
-    if (!guideData) {
-        roleData.guides = {};
         guideData = roleData.guides;
-    }
+        if (!guideData) {
+            roleData.guides = {};
+            guideData = roleData.guides;
+        }
 
-    renderMenu();
+        renderMenu();
 
-    const firstPageId = menuStructure[0]?.items[0]?.id || 'no-page';
-    if (firstPageId !== 'no-page') {
-        loadPage(firstPageId);
-    } else {
-        docContentDisplay.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted);">페이지가 없습니다. 새 페이지를 추가해주세요.</div>';
-        breadcrumbCurrent.textContent = '-';
+        const firstPageId = menuStructure[0]?.items[0]?.id || 'no-page';
+        const pageToLoad = targetPageId || firstPageId;
+        if (pageToLoad !== 'no-page') {
+            loadPage(pageToLoad);
+        } else {
+            docContentDisplay.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted);">페이지가 없습니다. 새 페이지를 추가해주세요.</div>';
+            breadcrumbCurrent.textContent = '-';
+        }
     }
 
     persistAll();
 
-    // Track role switch
     if (typeof gtag === 'function') {
         gtag('event', 'role_switch', {
             'role_id': role,
@@ -467,6 +516,25 @@ function deleteRole() {
     persistAll();
 }
 
+function moveRole(direction) {
+    const keys = Object.keys(rolesData);
+    const index = keys.indexOf(currentState.currentRole);
+    if (index === -1) return;
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= keys.length) return;
+
+    // Swap keys in rolesData (objects maintain insertion order for string keys in JS)
+    const newKeys = [...keys];
+    [newKeys[index], newKeys[targetIndex]] = [newKeys[targetIndex], newKeys[index]];
+
+    const newRolesData = {};
+    newKeys.forEach(k => newRolesData[k] = rolesData[k]);
+    rolesData = newRolesData;
+
+    renderRoleSelect();
+    persistAll();
+}
+
 function renderSubgroupSelect() {
     const role = currentState.currentRole;
     if (!rolesData[role].subgroups) return;
@@ -480,7 +548,7 @@ function renderSubgroupSelect() {
     });
 }
 
-function switchSubgroup(subId) {
+function switchSubgroup(subId, targetPageId = null) {
     const role = currentState.currentRole;
     const subgroup = rolesData[role].subgroups.find(s => s.id === subId);
     if (!subgroup) return;
@@ -493,16 +561,23 @@ function switchSubgroup(subId) {
         addSubcollectionBtn.style.display = 'block';
     }
 
-    // Check for sub-collections (Level 3)
     const hasSubcollections = subgroup.subcollections && subgroup.subcollections.length > 0;
 
     if (hasSubcollections) {
         subcollectionSelectorContainer.style.display = 'block';
         renderSubcollectionSelect();
         const lastSubColId = localStorage.getItem(`sugar_last_subcol_${subId}`);
-        const subColToSelect = (lastSubColId && subgroup.subcollections.find(s => s.id === lastSubColId)) ? lastSubColId : subgroup.subcollections[0].id;
+
+        let subColToSelect;
+        const path = findPathByPageId(targetPageId);
+        if (path && path.role === role && path.subgroup === subId && path.subcollection) {
+            subColToSelect = path.subcollection;
+        } else {
+            subColToSelect = (lastSubColId && subgroup.subcollections.find(s => s.id === lastSubColId)) ? lastSubColId : subgroup.subcollections[0].id;
+        }
+
         subcollectionSelect.value = subColToSelect;
-        switchSubcollection(subColToSelect);
+        switchSubcollection(subColToSelect, targetPageId);
     } else {
         subcollectionSelectorContainer.style.display = 'none';
         currentState.activeSubcollection = null;
@@ -510,8 +585,9 @@ function switchSubgroup(subId) {
 
         renderMenu();
         const firstPageId = menuStructure[0]?.items[0]?.id || 'no-page';
-        if (firstPageId !== 'no-page') {
-            loadPage(firstPageId);
+        const pageToLoad = targetPageId || firstPageId;
+        if (pageToLoad !== 'no-page') {
+            loadPage(pageToLoad);
         } else {
             docContentDisplay.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted);">페이지가 없습니다. 새 페이지를 추가해주세요.</div>';
         }
@@ -533,7 +609,7 @@ function renderSubcollectionSelect() {
     });
 }
 
-function switchSubcollection(scId) {
+function switchSubcollection(scId, targetPageId = null) {
     const role = currentState.currentRole;
     const subId = currentState.activeSubgroup;
     const subgroup = rolesData[role].subgroups.find(s => s.id === subId);
@@ -550,8 +626,9 @@ function switchSubcollection(scId) {
 
     renderMenu();
     const firstPageId = menuStructure[0]?.items[0]?.id || 'no-page';
-    if (firstPageId !== 'no-page') {
-        loadPage(firstPageId);
+    const pageToLoad = targetPageId || firstPageId;
+    if (pageToLoad !== 'no-page') {
+        loadPage(pageToLoad);
     } else {
         docContentDisplay.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted);">페이지가 없습니다. 새 페이지를 추가해주세요.</div>';
     }
@@ -639,6 +716,24 @@ function deleteSubcollection() {
     persistAll();
 }
 
+function moveSubcollection(direction) {
+    const role = currentState.currentRole;
+    const subId = currentState.activeSubgroup;
+    const subgroup = rolesData[role].subgroups.find(s => s.id === subId);
+    const subcollections = subgroup.subcollections;
+    if (!subcollections) return;
+    const index = subcollections.findIndex(sc => sc.id === currentState.activeSubcollection);
+    if (index === -1) return;
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= subcollections.length) return;
+
+    [subcollections[index], subcollections[targetIndex]] = [subcollections[targetIndex], subcollections[index]];
+
+    renderSubcollectionSelect();
+    subcollectionSelect.value = currentState.activeSubcollection;
+    persistAll();
+}
+
 function addSubgroup() {
     const role = currentState.currentRole;
     const title = prompt('새 서브 메뉴의 이름을 입력하세요 (예: 아파트, 빌라):');
@@ -708,6 +803,22 @@ function deleteSubgroup() {
 
     renderSubgroupSelect();
     switchSubgroup(rolesData[role].subgroups[0].id);
+    persistAll();
+}
+
+function moveSubgroup(direction) {
+    const role = currentState.currentRole;
+    const subgroups = rolesData[role].subgroups;
+    if (!subgroups) return;
+    const index = subgroups.findIndex(s => s.id === currentState.activeSubgroup);
+    if (index === -1) return;
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= subgroups.length) return;
+
+    [subgroups[index], subgroups[targetIndex]] = [subgroups[targetIndex], subgroups[index]];
+
+    renderSubgroupSelect();
+    subgroupSelect.value = currentState.activeSubgroup;
     persistAll();
 }
 
@@ -1457,8 +1568,34 @@ function exitEditMode() {
     }
 }
 
-function saveEdits() {
+function tempSaveEdits() {
     const markdownContent = contentEditor.value;
+    if (!guideData[currentState.activePage]) return;
+
+    guideData[currentState.activePage].content = markdownContent;
+
+    // Render Preview
+    if (editorPreview.style.display === 'block') {
+        editorPreview.innerHTML = marked.parse(markdownContent);
+        applyMediaDimensions(editorPreview);
+    }
+
+    persistAll();
+
+    // Show temporary status
+    const originalText = tempSaveContentBtn.textContent;
+    tempSaveContentBtn.textContent = '✅ 저장됨';
+    setTimeout(() => {
+        tempSaveContentBtn.textContent = originalText;
+    }, 2000);
+
+    console.log(`Temporarily saved (local) Markdown for ${currentState.activePage}`);
+}
+
+async function saveEdits() {
+    const markdownContent = contentEditor.value;
+    if (!guideData[currentState.activePage]) return;
+
     guideData[currentState.activePage].content = markdownContent;
 
     // Render Markdown to HTML and update display
@@ -1466,7 +1603,13 @@ function saveEdits() {
     applyMediaDimensions(docContentDisplay);
 
     persistAll();
-    console.log(`Saved Markdown for ${currentState.activePage}`);
+
+    // Now Sync to Server (This fulfills "저장" part of the requirement)
+    if (currentState.isLoggedIn) {
+        await publishSiteData(true); // Silent save to server
+    }
+
+    console.log(`Saved and synced Markdown for ${currentState.activePage}`);
     exitEditMode();
 }
 
@@ -1476,6 +1619,7 @@ function setupEventListeners() {
     editBtn.addEventListener('click', enterEditMode);
     previewToggleBtn.addEventListener('click', togglePreview);
     cancelEditBtn.addEventListener('click', exitEditMode);
+    tempSaveContentBtn.addEventListener('click', tempSaveEdits);
     saveContentBtn.addEventListener('click', saveEdits);
 
     // Menu management
@@ -1535,6 +1679,14 @@ function setupEventListeners() {
     addSubcollectionBtn.addEventListener('click', addSubcollection);
     renameSubcollectionBtn.addEventListener('click', renameSubcollection);
     deleteSubcollectionBtn.addEventListener('click', deleteSubcollection);
+
+    // Order management
+    moveRoleUpBtn.addEventListener('click', () => moveRole(-1));
+    moveRoleDownBtn.addEventListener('click', () => moveRole(1));
+    moveSubgroupUpBtn.addEventListener('click', () => moveSubgroup(-1));
+    moveSubgroupDownBtn.addEventListener('click', () => moveSubgroup(1));
+    moveSubcollectionUpBtn.addEventListener('click', () => moveSubcollection(-1));
+    moveSubcollectionDownBtn.addEventListener('click', () => moveSubcollection(1));
 
     // Handle back/forward buttons
     window.addEventListener('hashchange', () => {

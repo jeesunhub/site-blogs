@@ -74,6 +74,8 @@
                             <!-- Options will be populated dynamically -->
                         </select>
                         <div id="role-manage-actions" style="display: none; gap: 0.3rem;">
+                            <button id="move-role-up-btn" class="edit-btn-small" title="순서 위로">▲</button>
+                            <button id="move-role-down-btn" class="edit-btn-small" title="순서 아래로">▼</button>
                             <button id="rename-role-btn" class="edit-btn-small" title="가이드 이름 수정">✏️</button>
                             <button id="delete-role-btn" class="edit-btn-small" title="가이드 삭제"
                                 style="color: #ef4444;">✕</button>
@@ -100,6 +102,8 @@
                                 <!-- Options will be populated dynamically -->
                             </select>
                             <div id="subgroup-manage-actions" style="display: none; gap: 0.3rem;">
+                                <button id="move-subgroup-up-btn" class="edit-btn-small" title="순서 위로">▲</button>
+                                <button id="move-subgroup-down-btn" class="edit-btn-small" title="순서 아래로">▼</button>
                                 <button id="rename-subgroup-btn" class="edit-btn-small" title="서브 메뉴명 수정">✏️</button>
                                 <button id="delete-subgroup-btn" class="edit-btn-small" title="서브 메뉴 삭제"
                                     style="color: #ef4444;">✕</button>
@@ -119,6 +123,9 @@
                                 <!-- Options will be populated dynamically -->
                             </select>
                             <div id="subcollection-manage-actions" style="display: none; gap: 0.3rem;">
+                                <button id="move-subcollection-up-btn" class="edit-btn-small" title="순서 위로">▲</button>
+                                <button id="move-subcollection-down-btn" class="edit-btn-small"
+                                    title="순서 아래로">▼</button>
                                 <button id="rename-subcollection-btn" class="edit-btn-small"
                                     title="서브 모음명 수정">✏️</button>
                                 <button id="delete-subcollection-btn" class="edit-btn-small" title="서브 모음 삭제"
@@ -127,13 +134,13 @@
                         </div>
                     </div>
                 </div>
-                <div class="sidebar-actions" id="sidebar-actions" style="gap: 0.5rem; flex-direction: column;">
-                    <button id="add-page-btn" class="btn btn-primary" style="width: 100%; font-size: 0.85rem;">➕ 새 페이지
-                        추가</button>
-                    <button id="add-cat-btn" class="btn btn-outline" style="width: 100%; font-size: 0.85rem;">📂 새 카테고리
-                        추가</button>
-                    <button id="add-divider-btn" class="btn btn-ghost" style="width: 100%; font-size: 0.85rem;">➖ 구분선
-                        추가</button>
+                <div class="sidebar-actions" id="sidebar-actions" style="gap: 0.3rem;">
+                    <button id="add-cat-btn" class="btn btn-outline"
+                        style="flex: 1; font-size: 0.65rem; padding: 0.4rem 0.1rem; white-space: nowrap;">+카테고리</button>
+                    <button id="add-page-btn" class="btn btn-primary"
+                        style="flex: 1; font-size: 0.65rem; padding: 0.4rem 0.1rem; white-space: nowrap;">+페이지</button>
+                    <button id="add-divider-btn" class="btn btn-ghost"
+                        style="flex: 1; font-size: 0.65rem; padding: 0.4rem 0.1rem; white-space: nowrap;">+구분선</button>
                 </div>
                 <nav class="nav-tree" id="nav-tree">
                     <!-- Menu tree will be injected here -->
@@ -168,6 +175,8 @@
                                 <button id="preview-toggle" class="btn btn-outline"
                                     style="margin-right: auto;">미리보기</button>
                                 <button id="cancel-edit" class="btn btn-ghost">취소</button>
+                                <button id="temp-save-content" class="btn btn-outline"
+                                    style="margin-right: 0.5rem;">임시저장</button>
                                 <button id="save-content" class="btn btn-primary">저장하기</button>
                             </div>
                         </div>
