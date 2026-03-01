@@ -452,7 +452,8 @@ body {
 .is-logged-in #media-library-btn,
 .is-logged-in #add-role-btn,
 .is-logged-in #add-subgroup-btn,
-.is-logged-in #add-subcollection-btn {
+.is-logged-in #add-subcollection-btn,
+.is-logged-in #db-management-btn {
     border: 1.5px solid #f59e0b !important;
     /* Orange (Amber 500) */
     color: #d97706 !important;
@@ -467,7 +468,8 @@ body {
 .is-logged-in #media-library-btn:hover,
 .is-logged-in #add-role-btn:hover,
 .is-logged-in #add-subgroup-btn:hover,
-.is-logged-in #add-subcollection-btn:hover {
+.is-logged-in #add-subcollection-btn:hover,
+.is-logged-in #db-management-btn:hover {
     background: rgba(245, 158, 11, 0.15) !important;
     border-color: #d97706 !important;
 }

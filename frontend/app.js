@@ -114,7 +114,7 @@ const editorPreview = document.getElementById('editor-preview');
 const previewToggleBtn = document.getElementById('preview-toggle');
 const cancelEditBtn = document.getElementById('cancel-edit');
 const saveContentBtn = document.getElementById('save-content');
-const tempSaveContentBtn = document.getElementById('temp-save-content');
+const visibilityToggleBtn = document.getElementById('visibility-toggle');
 const contentWrapper = document.getElementById('content-wrapper');
 
 const sidebarControls = document.getElementById('sidebar-controls');
@@ -135,6 +135,15 @@ const menuModal = document.getElementById('menu-modal');
 const menuJsonEditor = document.getElementById('menu-json-editor');
 const closeMenuModalBtn = document.getElementById('close-menu-modal');
 const saveMenuBtn = document.getElementById('save-menu');
+
+const dbManagementBtn = document.getElementById('db-management-btn');
+const dbModal = document.getElementById('db-modal');
+const closeDbModalBtn = document.getElementById('close-db-modal');
+const dbExportBtn = document.getElementById('db-export-btn');
+const dbImportInput = document.getElementById('db-import-input');
+const dbImportTriggerBtn = document.getElementById('db-import-trigger-btn');
+const dbImportStatus = document.getElementById('db-import-status');
+
 const appContainer = document.getElementById('app');
 const roleSelect = document.getElementById('role-select');
 const roleManageActions = document.getElementById('role-manage-actions');
@@ -176,6 +185,7 @@ const addDividerBtn = document.getElementById('add-divider-btn');
 const themeToggleBtn = document.getElementById('theme-toggle');
 const deployBtn = document.getElementById('deploy-btn');
 const API_BASE_URL = '__API_BASE_URL__';
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
 // App State
 let currentState = {
@@ -202,28 +212,33 @@ const sidebarOverlay = document.getElementById('sidebar-overlay');
 
 // Initialize
 async function init() {
-    // 1. Try to load from Server first
-    const dataUrl = `${API_BASE_URL}/api/data?_=${Date.now()}`;
-    console.log(`[INIT] Fetching data from: ${dataUrl}`);
-    try {
-        const response = await fetch(dataUrl);
-        if (response.ok) {
-            const serverData = await response.json();
-            if (serverData.rolesData) rolesData = serverData.rolesData;
-            if (serverData.mediaAssets) mediaAssets = serverData.mediaAssets;
-            if (serverData.sugarAppUrl) currentState.sugarAppUrl = serverData.sugarAppUrl;
-            console.log('[INIT] Server data loaded successfully');
-        } else {
-            console.warn(`[INIT] Server returned status: ${response.status}. Falling back to local data.`);
-            throw new Error(`Status ${response.status}`);
-        }
-    } catch (err) {
-        console.error('[INIT] Server data load failed (CORS or Network Error):', err);
-        // Fallback to local storage if server is down
-        const savedRolesData = localStorage.getItem('sugar_roles_data');
+    // 1. Try to load from Server or LocalStorage
+    const savedRolesData = localStorage.getItem('sugar_roles_data');
+    const savedMedia = localStorage.getItem('sugar_media');
+
+    if (isLocal) {
+        console.log('[INIT] Local environment detected. Loading from localStorage.');
         if (savedRolesData) rolesData = JSON.parse(savedRolesData);
-        const savedMedia = localStorage.getItem('sugar_media');
         if (savedMedia) mediaAssets = JSON.parse(savedMedia);
+    } else {
+        const dataUrl = `${API_BASE_URL}/api/data?_=${Date.now()}`;
+        console.log(`[INIT] Fetching data from: ${dataUrl}`);
+        try {
+            const response = await fetch(dataUrl);
+            if (response.ok) {
+                const serverData = await response.json();
+                if (serverData.rolesData) rolesData = serverData.rolesData;
+                if (serverData.mediaAssets) mediaAssets = serverData.mediaAssets;
+                if (serverData.sugarAppUrl) currentState.sugarAppUrl = serverData.sugarAppUrl;
+                console.log('[INIT] Server data loaded successfully');
+            } else {
+                throw new Error(`Status ${response.status}`);
+            }
+        } catch (err) {
+            console.warn('[INIT] Server data fetch failed, falling back to local.', err);
+            if (savedRolesData) rolesData = JSON.parse(savedRolesData);
+            if (savedMedia) mediaAssets = JSON.parse(savedMedia);
+        }
     }
 
     // 2. Local settings (Theme, Role)
@@ -316,13 +331,40 @@ async function persistAll() {
     }
 }
 
+async function getAuthToken() {
+    if (!currentState.isLoggedIn) return null;
+    try {
+        if (window.Clerk && Clerk.session) {
+            return await Clerk.session.getToken();
+        }
+        const localSession = JSON.parse(sessionStorage.getItem('local_test_user'));
+        if (localSession) {
+            return `local_test_${localSession.email}`;
+        }
+    } catch (e) {
+        console.warn('Failed to get auth token:', e);
+    }
+    return null;
+}
+
 async function publishSiteData(silent = false) {
     if (!currentState.isLoggedIn) return;
+
+    if (isLocal) {
+        if (!silent) alert('로컬 환경입니다. 변경사항이 로컬 저장소(LocalStorage)에 성공적으로 저장되었습니다.');
+        deployBtn.style.background = 'var(--primary)';
+        deployBtn.textContent = '🚀 로컬 저장 완료';
+        setTimeout(() => {
+            deployBtn.textContent = '🚀 배포하기';
+        }, 3000);
+        return;
+    }
 
     deployBtn.disabled = true;
     deployBtn.textContent = '⏳ 배포 중...';
 
     try {
+        const token = await getAuthToken();
         const dataToSave = {
             rolesData,
             mediaAssets,
@@ -331,7 +373,10 @@ async function publishSiteData(silent = false) {
 
         const response = await fetch(`${API_BASE_URL}/api/data`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
             body: JSON.stringify(dataToSave)
         });
 
@@ -874,6 +919,8 @@ function renderMenu() {
         ul.dataset.catIndex = catIndex;
 
         cat.items.forEach((item, itemIndex) => {
+            if (!currentState.isLoggedIn && guideData[item.id]?.isPrivate) return;
+
             const li = document.createElement('li');
             li.className = 'nav-item-container';
 
@@ -1171,6 +1218,73 @@ function getImageDimensions(url) {
     });
 }
 
+function openDbModal() {
+    dbModal.classList.add('active');
+}
+
+function closeDbModal() {
+    dbModal.classList.remove('active');
+    dbImportStatus.textContent = '';
+}
+
+function exportDatabase() {
+    const dataToExport = {
+        rolesData,
+        mediaAssets,
+        sugarAppUrl: currentState.sugarAppUrl,
+        exportedAt: new Date().toISOString()
+    };
+
+    const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    link.href = url;
+    link.download = `sugar_db_export_${timestamp}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+
+async function handleDbImport(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+        try {
+            const importedData = JSON.parse(event.target.result);
+
+            if (!importedData.rolesData) {
+                throw new Error('유효한 데이터 형식이 아닙니다. (rolesData 누락)');
+            }
+
+            if (confirm('현재 모든 데이터를 업로드한 파일로 교체하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+                dbImportStatus.textContent = '⌛ 데이터 반영 중...';
+
+                // Update local state
+                rolesData = importedData.rolesData;
+                if (importedData.mediaAssets) mediaAssets = importedData.mediaAssets;
+                if (importedData.sugarAppUrl) currentState.sugarAppUrl = importedData.sugarAppUrl;
+
+                // Sync to Server (Full sync)
+                await publishSiteData(false);
+
+                dbImportStatus.textContent = '✅ 데이터 복구가 완료되었습니다. 페이지를 새로고침합니다.';
+                setTimeout(() => window.location.reload(), 1500);
+            }
+        } catch (err) {
+            console.error('Import failed:', err);
+            dbImportStatus.innerHTML = `<span style="color: #ef4444;">❌ 오류: ${err.message}</span>`;
+        }
+    };
+    reader.readAsText(file);
+    // Reset input for same file upload
+    e.target.value = '';
+}
+
 function renderMediaLibrary() {
     mediaGrid.innerHTML = '';
 
@@ -1302,8 +1416,12 @@ async function handleFileUpload(e) {
     formData.append('file', file);
 
     try {
+        const token = await getAuthToken();
         const response = await fetch(`${API_BASE_URL}/api/upload`, {
             method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
             body: formData
         });
 
@@ -1338,8 +1456,21 @@ function loadPage(pageId) {
     const data = guideData[pageId];
     if (!data) return;
 
+    if (!currentState.isLoggedIn && data.isPrivate) {
+        docContentDisplay.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted);">비공개 문서입니다.</div>';
+        return;
+    }
+
     currentState.activePage = pageId;
     currentState.isEditing = false;
+
+    // Update Visibility Toggle State
+    if (visibilityToggleBtn) {
+        const isPrivate = data.isPrivate || false;
+        visibilityToggleBtn.textContent = isPrivate ? '비공개' : '공개';
+        visibilityToggleBtn.classList.toggle('btn-outline', !isPrivate);
+        visibilityToggleBtn.classList.toggle('btn-danger', isPrivate);
+    }
 
     // Update URL hash without jumping
     if (window.location.hash !== `#${pageId}`) {
@@ -1568,28 +1699,20 @@ function exitEditMode() {
     }
 }
 
-function tempSaveEdits() {
-    const markdownContent = contentEditor.value;
-    if (!guideData[currentState.activePage]) return;
+function toggleVisibility() {
+    const pageId = currentState.activePage;
+    if (!guideData[pageId]) return;
 
-    guideData[currentState.activePage].content = markdownContent;
+    const currentPrivate = guideData[pageId].isPrivate || false;
+    guideData[pageId].isPrivate = !currentPrivate;
 
-    // Render Preview
-    if (editorPreview.style.display === 'block') {
-        editorPreview.innerHTML = marked.parse(markdownContent);
-        applyMediaDimensions(editorPreview);
-    }
+    const isNowPrivate = guideData[pageId].isPrivate;
+    visibilityToggleBtn.textContent = isNowPrivate ? '비공개' : '공개';
+    visibilityToggleBtn.classList.toggle('btn-outline', !isNowPrivate);
+    visibilityToggleBtn.classList.toggle('btn-danger', isNowPrivate);
 
     persistAll();
-
-    // Show temporary status
-    const originalText = tempSaveContentBtn.textContent;
-    tempSaveContentBtn.textContent = '✅ 저장됨';
-    setTimeout(() => {
-        tempSaveContentBtn.textContent = originalText;
-    }, 2000);
-
-    console.log(`Temporarily saved (local) Markdown for ${currentState.activePage}`);
+    renderMenu();
 }
 
 async function saveEdits() {
@@ -1604,12 +1727,8 @@ async function saveEdits() {
 
     persistAll();
 
-    // Now Sync to Server (This fulfills "저장" part of the requirement)
-    if (currentState.isLoggedIn) {
-        await publishSiteData(true); // Silent save to server
-    }
-
-    console.log(`Saved and synced Markdown for ${currentState.activePage}`);
+    // Local-only save as requested (notSync to Server automatically)
+    console.log(`Saved (local-only) Markdown for ${currentState.activePage}`);
     exitEditMode();
 }
 
@@ -1619,7 +1738,7 @@ function setupEventListeners() {
     editBtn.addEventListener('click', enterEditMode);
     previewToggleBtn.addEventListener('click', togglePreview);
     cancelEditBtn.addEventListener('click', exitEditMode);
-    tempSaveContentBtn.addEventListener('click', tempSaveEdits);
+    visibilityToggleBtn.addEventListener('click', toggleVisibility);
     saveContentBtn.addEventListener('click', saveEdits);
 
     // Menu management
@@ -1645,6 +1764,13 @@ function setupEventListeners() {
     addMediaBtn.addEventListener('click', addMedia);
     uploadTriggerBtn.addEventListener('click', () => mediaFileInput.click());
     mediaFileInput.addEventListener('change', handleFileUpload);
+
+    // DB Management
+    dbManagementBtn.addEventListener('click', openDbModal);
+    closeDbModalBtn.addEventListener('click', closeDbModal);
+    dbExportBtn.addEventListener('click', exportDatabase);
+    dbImportTriggerBtn.addEventListener('click', () => dbImportInput.click());
+    dbImportInput.addEventListener('change', handleDbImport);
 
     // Handle search (Basic simulation)
     document.getElementById('search-input').addEventListener('input', (e) => {

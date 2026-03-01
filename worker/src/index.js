@@ -30,6 +30,21 @@ export default {
         const url = new URL(request.url);
         const path = url.pathname.toLowerCase().replace(/\/$/, '');
 
+        // Token Verification for POST/PUT/DELETE
+        if (request.method !== 'GET' && request.method !== 'OPTIONS' && (path.startsWith('/api/') && path !== '/api/health')) {
+            const authHeader = request.headers.get('Authorization');
+            if (!authHeader || !authHeader.startsWith('Bearer ')) {
+                return createResponse({ error: 'Unauthorized: Missing or invalid token' }, 401);
+            }
+            const token = authHeader.split(' ')[1];
+            if (!token || token.length < 5) {
+                return createResponse({ error: 'Unauthorized: Invalid token format' }, 401);
+            }
+            // For production with Clerk, we'd verify JWT here. 
+            // For now, we allow 'local_test_' prefix to maintain test login.
+            console.log(`[AUTH] Token detected. Start with: ${token.substring(0, 15)}...`);
+        }
+
         try {
             // Health Check
             if (path === '/api/health') {
