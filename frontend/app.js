@@ -185,7 +185,12 @@ const addDividerBtn = document.getElementById('add-divider-btn');
 const themeToggleBtn = document.getElementById('theme-toggle');
 const deployBtn = document.getElementById('deploy-btn');
 const API_BASE_URL = '__API_BASE_URL__';
-const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const isLocal = window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname === '::1' ||
+    window.location.hostname.startsWith('192.168.') ||
+    window.location.hostname.startsWith('172.') ||
+    window.location.hostname.startsWith('10.');
 
 // App State
 let currentState = {
@@ -212,7 +217,43 @@ const sidebarOverlay = document.getElementById('sidebar-overlay');
 
 // Initialize
 async function init() {
-    // 1. Try to load from Server or LocalStorage
+    // 1. Clerk Initialization FIRST to ensure isLoggedIn is correct before data load
+    try {
+        if (!window.Clerk) {
+            await new Promise(resolve => {
+                const check = setInterval(() => {
+                    if (window.Clerk) {
+                        clearInterval(check);
+                        resolve();
+                    }
+                }, 100);
+            });
+        }
+        await Clerk.load();
+
+        const localSession = isLocal ? JSON.parse(sessionStorage.getItem('local_test_user')) : null;
+
+        if (Clerk.user || localSession) {
+            currentState.isLoggedIn = true;
+            if (Clerk.user) {
+                currentState.currentUser = {
+                    name: Clerk.user.fullName || Clerk.user.firstName,
+                    email: Clerk.user.primaryEmailAddress.emailAddress
+                };
+            } else {
+                currentState.currentUser = localSession;
+            }
+        } else {
+            currentState.isLoggedIn = false;
+            currentState.currentUser = null;
+        }
+        updateAuthUI();
+    } catch (err) {
+        console.error('Clerk load failed:', err);
+        updateAuthUI();
+    }
+
+    // 2. Try to load from Server or LocalStorage
     const savedRolesData = localStorage.getItem('sugar_roles_data');
     const savedMedia = localStorage.getItem('sugar_media');
 
@@ -241,7 +282,7 @@ async function init() {
         }
     }
 
-    // 2. Local settings (Theme, Role)
+    // 3. Local settings (Theme, Role)
     const savedRole = localStorage.getItem('sugar_current_role');
     const savedTheme = localStorage.getItem('sugar_theme');
     const savedShortcutUrl = localStorage.getItem('sugar_app_url');
@@ -271,48 +312,8 @@ async function init() {
     renderRoleSelect();
     switchRole(initialRole, hash);
 
-    // 3. Clerk Initialization
-    try {
-        if (!window.Clerk) {
-            await new Promise(resolve => {
-                const check = setInterval(() => {
-                    if (window.Clerk) {
-                        clearInterval(check);
-                        resolve();
-                    }
-                }, 100);
-            });
-        }
-
-        await Clerk.load();
-
-        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        const localSession = isLocal ? JSON.parse(sessionStorage.getItem('local_test_user')) : null;
-
-        if (Clerk.user || localSession) {
-            currentState.isLoggedIn = true;
-            if (Clerk.user) {
-                currentState.currentUser = {
-                    name: Clerk.user.fullName || Clerk.user.firstName,
-                    email: Clerk.user.primaryEmailAddress.emailAddress
-                };
-            } else {
-                currentState.currentUser = localSession;
-            }
-        } else {
-            currentState.isLoggedIn = false;
-            currentState.currentUser = null;
-        }
-
-        updateAuthUI();
-    } catch (err) {
-        console.error('Clerk load failed:', err);
-        updateAuthUI(); // Still try to update UI (might show local login if on localhost)
-    }
-
     renderMenu();
     updateEditControlsVisibility();
-    // No longer calling loadPage here, as switchRole handles it via targetPageId
     setupEventListeners();
 }
 
@@ -349,6 +350,9 @@ async function getAuthToken() {
 
 async function publishSiteData(silent = false) {
     if (!currentState.isLoggedIn) return;
+
+    // Always persist to local storage first for immediate data safety and local test environment support
+    await persistAll();
 
     if (isLocal) {
         if (!silent) alert('로컬 환경입니다. 변경사항이 로컬 저장소(LocalStorage)에 성공적으로 저장되었습니다.');
@@ -436,6 +440,14 @@ function switchRole(role, targetPageId = null) {
     if (roleSelect) roleSelect.value = role;
 
     const roleData = rolesData[role];
+
+    // Always update guideData to point to current role's guides
+    guideData = roleData.guides;
+    if (!guideData) {
+        roleData.guides = {};
+        guideData = roleData.guides;
+    }
+
     const hasSubgroups = roleData.subgroups && roleData.subgroups.length > 0;
 
     if (hasSubgroups) {
@@ -459,12 +471,6 @@ function switchRole(role, targetPageId = null) {
         currentState.activeSubgroup = null;
         currentState.activeSubcollection = null;
         menuStructure = roleData.menu;
-
-        guideData = roleData.guides;
-        if (!guideData) {
-            roleData.guides = {};
-            guideData = roleData.guides;
-        }
 
         renderMenu();
 
@@ -973,7 +979,7 @@ function renderMenu() {
 
                 // Event Listeners
                 a.addEventListener('click', (e) => {
-                    if (e.target.classList.contains('delete-item-btn') || e.target.classList.contains('edit-title-btn')) return;
+                    if (e.target.closest('.delete-item-btn') || e.target.closest('.edit-title-btn')) return;
                     e.preventDefault();
                     loadPage(item.id);
                 });
@@ -1269,6 +1275,9 @@ async function handleDbImport(e) {
                 if (importedData.mediaAssets) mediaAssets = importedData.mediaAssets;
                 if (importedData.sugarAppUrl) currentState.sugarAppUrl = importedData.sugarAppUrl;
 
+                // Important: Ensure data is saved locally first
+                await persistAll();
+
                 // Sync to Server (Full sync)
                 await publishSiteData(false);
 
@@ -1478,7 +1487,8 @@ function loadPage(pageId) {
     }
 
     // Render Markdown to HTML
-    let htmlContent = marked.parse(data.content.trim());
+    const contentToParse = data.content || '';
+    let htmlContent = marked.parse(contentToParse.trim());
 
     // Fix legacy/broken image URLs and relative paths
     if (API_BASE_URL && !API_BASE_URL.startsWith('__')) {
@@ -1828,12 +1838,6 @@ function updateAuthUI() {
     const userButtonDiv = document.getElementById('clerk-user-button');
 
     // Check if we have a Clerk user OR a local test session
-    const isLocal = window.location.hostname === 'localhost' ||
-        window.location.hostname === '127.0.0.1' ||
-        window.location.hostname === '::1' ||
-        window.location.hostname.startsWith('192.168.') ||
-        window.location.hostname.startsWith('172.') ||
-        window.location.hostname.startsWith('10.');
     const localSession = isLocal ? JSON.parse(sessionStorage.getItem('local_test_user')) : null;
 
     if (Clerk.user || localSession) {
