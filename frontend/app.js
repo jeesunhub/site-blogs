@@ -1509,8 +1509,20 @@ function loadPage(pageId) {
     updateEditControlsVisibility();
     exitEditMode();
 
-    // Update TOC (Simple simulation based on original data)
-    renderTOC(data.toc);
+    // Generate Dynamic TOC from Headings
+    const headings = docContentDisplay.querySelectorAll('h1, h2, h3, h4');
+    const dynamicToc = [];
+    headings.forEach((h, index) => {
+        // Generate a clean ID for the heading based on its text
+        const safeId = 'toc-' + index + '-' + h.textContent.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^\w-가-힣]/g, '');
+        h.id = safeId;
+        dynamicToc.push({
+            id: safeId,
+            text: h.textContent.trim(),
+            level: h.tagName // 'H1', 'H2', etc.
+        });
+    });
+    renderTOC(dynamicToc);
 
     // Update Menu Active State
     document.querySelectorAll('.nav-item').forEach(el => {
@@ -1579,12 +1591,32 @@ function editShortcut(e) {
 
 function renderTOC(tocItems) {
     tocList.innerHTML = '';
+    if (!tocItems || tocItems.length === 0) {
+        tocList.innerHTML = '<li style="color: var(--text-muted); font-size: 0.8rem;">목차가 없습니다.</li>';
+        return;
+    }
     tocItems.forEach(item => {
         const li = document.createElement('li');
-        const a = document.createElement('a');
-        a.href = `#`;
-        a.textContent = item;
-        li.appendChild(a);
+        // Extract level number (e.g., 'H2' -> 2)
+        const levelNum = parseInt(item.level.substring(1)) || 2;
+
+        // Apply indentation based on level (H1 = 0, H2 = 1, etc.)
+        const padding = (levelNum - 1) * 0.8;
+        li.style.paddingLeft = `${padding}rem`;
+
+        // Optional: Add a small indicator for H1
+        if (levelNum === 1) {
+            li.style.borderLeft = '2px solid var(--primary)';
+        }
+
+        li.innerHTML = `
+            <a href="#${item.id}" style="
+                font-size: ${levelNum === 1 ? '0.9rem' : '0.85rem'}; 
+                font-weight: ${levelNum === 1 ? '600' : '400'};
+                display: block;
+                padding: 2px 0;
+            ">${item.text}</a>
+        `;
         tocList.appendChild(li);
     });
 }
