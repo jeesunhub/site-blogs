@@ -202,7 +202,8 @@ let currentState = {
     activeSubcollection: null,
     isEditing: false,
     sugarAppUrl: 'https://sugar-app.dev',
-    theme: 'light'
+    theme: 'light',
+    modifiedPages: new Set()
 };
 
 // DOM Elements
@@ -305,6 +306,11 @@ async function init() {
 
     updateShortcutUI();
 
+    const savedModified = localStorage.getItem('sugar_modified_pages');
+    if (savedModified) {
+        currentState.modifiedPages = new Set(JSON.parse(savedModified));
+    }
+
     const hash = window.location.hash.replace('#', '');
     const path = findPathByPageId(hash);
     const initialRole = (path && path.role) ? path.role : ((savedRole && rolesData[savedRole]) ? savedRole : currentState.currentRole);
@@ -324,11 +330,18 @@ async function persistAll() {
     localStorage.setItem('sugar_media', JSON.stringify(mediaAssets));
     localStorage.setItem('sugar_app_url', currentState.sugarAppUrl);
     localStorage.setItem('sugar_theme', currentState.theme);
+    localStorage.setItem('sugar_modified_pages', JSON.stringify([...currentState.modifiedPages]));
 
     // Change button style to indicate unsaved changes
     if (currentState.isLoggedIn && deployBtn) {
-        deployBtn.style.background = '#f59e0b'; // Amber color for "pending"
-        deployBtn.textContent = '🚀 배포하기*';
+        const hasChanges = currentState.modifiedPages.size > 0;
+        if (hasChanges) {
+            deployBtn.style.background = '#f59e0b'; // Amber color for "pending"
+            deployBtn.textContent = '🚀 배포하기*';
+        } else {
+            deployBtn.style.background = 'var(--primary)';
+            deployBtn.textContent = '🚀 배포하기';
+        }
     }
 }
 
@@ -385,12 +398,17 @@ async function publishSiteData(silent = false) {
         });
 
         if (response.ok) {
+            currentState.modifiedPages.clear();
+            await persistAll();
+
             if (!silent) alert('성공적으로 배포되었습니다! 이제 모든 사용자가 변경 사항을 볼 수 있습니다.');
             deployBtn.style.background = 'var(--primary)';
             deployBtn.textContent = '🚀 배포 완료';
             setTimeout(() => {
                 deployBtn.textContent = '🚀 배포하기';
+                renderMenu(); // Refresh to remove asterisks
             }, 3000);
+            renderMenu();
         } else {
             throw new Error('Server response not ok');
         }
@@ -969,8 +987,10 @@ function renderMenu() {
                 a.dataset.catIndex = catIndex;
                 a.dataset.itemIndex = itemIndex;
 
+                const isModified = currentState.modifiedPages.has(item.id);
+
                 a.innerHTML = `
-                    <span class="nav-item-text">${item.title}</span>
+                    <span class="nav-item-text">${item.title}${isModified ? '*' : ''}</span>
                     <span class="nav-item-actions">
                         <span class="edit-title-btn" title="제목 수정">✏️</span>
                         <span class="delete-item-btn" title="삭제">✕</span>
@@ -1123,6 +1143,7 @@ function addPage() {
     };
 
     persistAll();
+    currentState.modifiedPages.add(id);
     renderMenu();
     loadPage(id);
 }
@@ -1152,6 +1173,7 @@ function renamePage(catIndex, itemIndex) {
     guideData[item.id].title = newTitle;
 
     persistAll();
+    currentState.modifiedPages.add(item.id);
     renderMenu();
     loadPage(item.id);
 }
@@ -1754,6 +1776,7 @@ function toggleVisibility() {
     visibilityToggleBtn.classList.toggle('btn-danger', isNowPrivate);
 
     persistAll();
+    currentState.modifiedPages.add(pageId);
     renderMenu();
 }
 
@@ -1768,6 +1791,8 @@ async function saveEdits() {
     applyMediaDimensions(docContentDisplay);
 
     persistAll();
+    currentState.modifiedPages.add(currentState.activePage);
+    renderMenu();
 
     // Local-only save as requested (notSync to Server automatically)
     console.log(`Saved (local-only) Markdown for ${currentState.activePage}`);
