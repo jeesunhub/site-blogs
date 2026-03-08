@@ -218,9 +218,11 @@ const sidebarOverlay = document.getElementById('sidebar-overlay');
 
 // Initialize
 async function init() {
-    // 1. Clerk Initialization FIRST to ensure isLoggedIn is correct before data load
+    // 1. Clerk Initialization
     try {
+        // Wait for Clerk object to exist on window
         if (!window.Clerk) {
+            console.log('[AUTH] Waiting for Clerk script to load...');
             await new Promise(resolve => {
                 const check = setInterval(() => {
                     if (window.Clerk) {
@@ -231,15 +233,15 @@ async function init() {
             });
         }
 
-        // Explicitly provide publishable key to ensure UI components are loaded correctly
+        // Load Clerk - If key is in HTML, standard load() will pick it up
+        // We provide the key here as a fallback in case the HTML auto-init hasn't finished
         const publishableKey = '__CLERK_PUBLISHABLE_KEY__';
-        if (publishableKey && !publishableKey.startsWith('__')) {
-            const maskedKey = publishableKey.substring(0, 10) + '...' + publishableKey.substring(publishableKey.length - 4);
-            console.log(`[AUTH] Initializing Clerk with explicit key: ${maskedKey}`);
+
+        if (!Clerk.loaded) {
+            console.log('[AUTH] Calling Clerk.load()...');
             await Clerk.load({ publishableKey });
         } else {
-            console.warn('[AUTH] Clerk publishable key placeholder not replaced, attempting auto-detection.');
-            await Clerk.load();
+            console.log('[AUTH] Clerk already loaded via HTML attribute');
         }
 
         const localSession = isLocal ? JSON.parse(sessionStorage.getItem('local_test_user')) : null;
@@ -260,11 +262,7 @@ async function init() {
         }
         updateAuthUI();
     } catch (err) {
-        console.error('Clerk initialization failed:', err);
-        // If it's the "not loaded with UI components" error, it's usually fatal for UI
-        if (err.message && err.message.includes('Ui components')) {
-            console.error('CRITICAL: Clerk loaded without UI components. Check your publishable key.');
-        }
+        console.error('Clerk load failed:', err);
         updateAuthUI();
     }
 
@@ -1945,24 +1943,10 @@ function updateAuthUI() {
         // Standard Login Button
         signInDiv.innerHTML = '<button id="explicit-login-btn" class="btn btn-outline">로그인</button>';
         document.getElementById('explicit-login-btn')?.addEventListener('click', () => {
-            try {
-                if (typeof Clerk.openSignIn === 'function') {
-                    console.log('[AUTH] Attempting to open sign-in modal...');
-                    Clerk.openSignIn();
-                } else {
-                    throw new Error('Clerk.openSignIn is not a function');
-                }
-            } catch (err) {
-                console.warn('[AUTH] Modal sign-in failed, trying direct mount:', err);
-                // Fallback: If modal fails, try to mount the sign-in component directly to the div
-                if (typeof Clerk.mountSignIn === 'function') {
-                    signInDiv.innerHTML = '<div id="clerk-signin-fallback" style="margin-top: 1rem;"></div>';
-                    Clerk.mountSignIn(document.getElementById('clerk-signin-fallback'), {
-                        routing: 'hash'
-                    });
-                } else {
-                    alert('로그인 모듈을 실행할 수 없습니다. 잠시 후 다시 시도하거나 페이지를 새로고침해 주세요.');
-                }
+            if (typeof Clerk.openSignIn === 'function') {
+                Clerk.openSignIn();
+            } else {
+                alert('로그인 모듈을 불러오는 중입니다. 잠시 후 상단 "로그인" 버튼을 다시 클릭해 주세요.');
             }
         });
 
