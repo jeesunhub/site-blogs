@@ -233,13 +233,17 @@ async function init() {
             });
         }
 
-        // Load Clerk - If key is in HTML, standard load() will pick it up
-        // We provide the key here as a fallback in case the HTML auto-init hasn't finished
+        // Load Clerk - Instance URL will handle most UI loading, but we ensure headless: false
         const publishableKey = '__CLERK_PUBLISHABLE_KEY__';
 
         if (!Clerk.loaded) {
-            console.log('[AUTH] Calling Clerk.load()...');
-            await Clerk.load({ publishableKey });
+            console.log('[AUTH] Calling Clerk.load() with UI components enabled...');
+            // Ensure the loader has the key ready
+            window.Clerk.publishableKey = publishableKey;
+            await Clerk.load({
+                publishableKey,
+                headless: false
+            });
         } else {
             console.log('[AUTH] Clerk already loaded via HTML attribute');
         }
