@@ -1945,10 +1945,24 @@ function updateAuthUI() {
         // Standard Login Button
         signInDiv.innerHTML = '<button id="explicit-login-btn" class="btn btn-outline">로그인</button>';
         document.getElementById('explicit-login-btn')?.addEventListener('click', () => {
-            if (typeof Clerk.openSignIn === 'function') {
-                Clerk.openSignIn();
-            } else {
-                alert('로그인 모듈을 불러오는 중입니다. 잠시 후 상단 "로그인" 버튼을 다시 클릭해 주세요.');
+            try {
+                if (typeof Clerk.openSignIn === 'function') {
+                    console.log('[AUTH] Attempting to open sign-in modal...');
+                    Clerk.openSignIn();
+                } else {
+                    throw new Error('Clerk.openSignIn is not a function');
+                }
+            } catch (err) {
+                console.warn('[AUTH] Modal sign-in failed, trying direct mount:', err);
+                // Fallback: If modal fails, try to mount the sign-in component directly to the div
+                if (typeof Clerk.mountSignIn === 'function') {
+                    signInDiv.innerHTML = '<div id="clerk-signin-fallback" style="margin-top: 1rem;"></div>';
+                    Clerk.mountSignIn(document.getElementById('clerk-signin-fallback'), {
+                        routing: 'hash'
+                    });
+                } else {
+                    alert('로그인 모듈을 실행할 수 없습니다. 잠시 후 다시 시도하거나 페이지를 새로고침해 주세요.');
+                }
             }
         });
 
@@ -1978,10 +1992,11 @@ function updateAuthUI() {
             });
         }
 
-        // Also try to mount the standard Clerk button if possible
+        // Also try to mount the standard Clerk button if possible (Hidden as we have our own, but can serve as backup)
         if (typeof Clerk.mountSignInButton === 'function') {
             const mountDiv = document.createElement('div');
             mountDiv.style.marginTop = '0.5rem';
+            mountDiv.style.display = 'none'; // Keep hidden unless needed
             signInDiv.appendChild(mountDiv);
             Clerk.mountSignInButton(mountDiv, {
                 mode: 'modal'
